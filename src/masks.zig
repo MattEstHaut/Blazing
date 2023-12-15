@@ -1,5 +1,6 @@
 pub const Mask = u64;
 
+pub const one: Mask = 1;
 pub const full: Mask = 0xffffffffffffffff;
 
 pub const no_left: Mask = 0xfefefefefefefefe;
