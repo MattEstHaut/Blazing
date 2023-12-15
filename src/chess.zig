@@ -1,4 +1,4 @@
-const masks = @import("masks.zig").masks;
+const masks = @import("masks.zig");
 
 pub const Bitboard = u64;
 
