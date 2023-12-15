@@ -21,3 +21,20 @@ const BoardString = struct {
         }
     }
 };
+
+pub fn stringify(board: chess.Board) BoardString {
+    var result = BoardString{ .string = undefined };
+    result.write(masks.full, '.');
+    result.write(board.white.pawns, 'P');
+    result.write(board.white.knights, 'N');
+    result.write(board.white.bishops, 'B');
+    result.write(board.white.rooks, 'R');
+    result.write(board.white.queens, 'Q');
+    result.write(board.white.king, 'K');
+    result.write(board.black.pawns, 'p');
+    result.write(board.black.knights, 'n');
+    result.write(board.black.bishops, 'b');
+    result.write(board.black.rooks, 'r');
+    result.write(board.black.queens, 'q');
+    result.write(board.black.king, 'k');
+}
