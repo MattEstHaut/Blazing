@@ -51,3 +51,27 @@ pub const Board = struct {
         if (rights.q) self.castling_rights |= masks.castling_q;
     }
 };
+
+pub const void_board = Board{
+    .white = PiecePositions{
+        .pawns = 0,
+        .knights = 0,
+        .bishops = 0,
+        .rooks = 0,
+        .queens = 0,
+        .king = 0,
+    },
+    .black = PiecePositions{
+        .pawns = 0,
+        .knights = 0,
+        .bishops = 0,
+        .rooks = 0,
+        .queens = 0,
+        .king = 0,
+    },
+    .en_passant = 0,
+    .castling_rights = 0,
+    .side_to_move = Color.white,
+    .halfmove_clock = 0,
+    .fullmove_number = 0,
+};
