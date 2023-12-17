@@ -89,3 +89,19 @@ inline fn kingLookup(king: Bitboard) Bitboard {
     lookup |= no_right >> 7;
     return lookup;
 }
+
+inline fn knightLookup(knight: Bitboard) Bitboard {
+    const no_left = knight & masks.no_left;
+    const no_left_double = knight & masks.no_left_double;
+    const no_right = knight & masks.no_right;
+    const no_right_double = knight & masks.no_right_double;
+    var lookup = no_left >> 17;
+    lookup |= no_left_double >> 10;
+    lookup |= no_left_double << 6;
+    lookup |= no_left << 15;
+    lookup |= no_right << 17;
+    lookup |= no_right_double << 10;
+    lookup |= no_right_double >> 6;
+    lookup |= no_right >> 15;
+    return lookup;
+}
