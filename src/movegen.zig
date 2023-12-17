@@ -3,7 +3,8 @@ const masks = @import("masks.zig");
 
 pub const Index = u6;
 
-pub const rook_masks = rookMasks();
+const rook_masks = rookMasks();
+const bishop_masks = bishopMasks();
 
 inline fn kingLookup(king: chess.Bitboard) chess.Bitboard {
     const no_left = king & masks.no_left;
@@ -44,6 +45,29 @@ fn rookMasks() [64]masks.Mask {
         const col_mask = masks.first_col << col_index;
         const row_mask = masks.first_row << row_offset;
         result[index] = col_mask ^ row_mask;
+        if (index == 63) break;
+    }
+    return result;
+}
+
+fn bishopMasks() [64]masks.Mask {
+    var result: [64]masks.Mask = undefined;
+    var index: Index = 0;
+    while (true) : (index += 1) {
+        const col = index & 7;
+        var descending = masks.one << index;
+        var ascending = masks.one << index;
+
+        for (0..col) |_| {
+            descending |= descending >> 9;
+            ascending |= ascending << 7;
+        }
+        for (col..7) |_| {
+            descending |= descending << 9;
+            ascending |= ascending >> 7;
+        }
+
+        result[index] = descending ^ ascending;
         if (index == 63) break;
     }
     return result;
