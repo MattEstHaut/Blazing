@@ -37,4 +37,5 @@ pub fn stringify(board: chess.Board) BoardString {
     result.write(board.black.rooks, 'r');
     result.write(board.black.queens, 'q');
     result.write(board.black.king, 'k');
+    return result;
 }
