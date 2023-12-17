@@ -100,7 +100,7 @@ fn descendingMasks() [64]masks.Mask {
     return result;
 }
 
-fn bishopLookup(bishop: Index, occupied: chess.Bitboard) chess.Bitboard {
+inline fn bishopLookup(bishop: Index, occupied: chess.Bitboard) chess.Bitboard {
     @setRuntimeSafety(false);
 
     const bishop_mask = masks.one << bishop;
@@ -125,7 +125,7 @@ fn bishopLookup(bishop: Index, occupied: chess.Bitboard) chess.Bitboard {
     return ascending_lookup | descending_lookup;
 }
 
-fn rookLookup(rook: Index, occupied: chess.Bitboard) chess.Bitboard {
+inline fn rookLookup(rook: Index, occupied: chess.Bitboard) chess.Bitboard {
     @setRuntimeSafety(false);
 
     const rook_mask = masks.one << rook;
