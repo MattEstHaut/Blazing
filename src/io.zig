@@ -4,7 +4,7 @@ const masks = @import("masks.zig");
 const BoardString = struct {
     string: [71]u8,
 
-    fn write(self: *BoardString, where: masks.Mask, what: u8) void {
+    fn write(self: *BoardString, where: masks.Mask, what: u8) BoardString {
         var index: u64 = 0;
         var mask: masks.Mask = 1;
 
@@ -19,6 +19,8 @@ const BoardString = struct {
                 index += 1;
             }
         }
+
+        return self.*;
     }
 };
 
