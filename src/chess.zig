@@ -10,7 +10,7 @@ const PiecePositions = struct {
     queens: Bitboard,
     king: Bitboard,
 
-    pub inline fn occupied(self: *PiecePositions) Bitboard {
+    pub inline fn occupied(self: *const PiecePositions) Bitboard {
         return self.pawns | self.knights | self.bishops | self.rooks | self.queens | self.king;
     }
 };
