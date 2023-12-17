@@ -130,3 +130,15 @@ pub inline fn rookLookup(rook: chess.Bitboard, occupied: chess.Bitboard) chess.B
 inline fn queenLookup(queen: Index, occupied: chess.Bitboard) chess.Bitboard {
     return bishopLookup(queen, occupied) | rookLookup(queen, occupied);
 }
+
+inline fn pawnForward(pawns: chess.Bitboard, occupied: chess.Bitboard, comptime color: chess.Color) chess.Bitboard {
+    switch (color) {
+        .white => return (pawns >> 8) & ~occupied,
+        .black => return (pawns << 8) & ~occupied,
+    }
+}
+
+inline fn pawnDoubleForward(pawns: chess.Bitboard, occupied: chess.Bitboard, comptime color: chess.Color) chess.Bitboard {
+    const pawns_double = if (color == .white) pawns & masks.last_row >> 8 else pawns & masks.first_row << 8;
+    return pawnForward(pawnForward(pawns_double, occupied, color), occupied, color);
+}
