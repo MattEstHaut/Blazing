@@ -101,18 +101,21 @@ fn descendingMasks() [64]masks.Mask {
 }
 
 fn bishopLookup(bishop: Index, occupied: chess.Bitboard) chess.Bitboard {
+    @setRuntimeSafety(false);
+
     const bishop_mask = masks.one << bishop;
     const ascending = ascending_masks[bishop];
     const descending = descending_masks[bishop];
+    const occupied_mask = occupied & ~bishop_mask;
 
-    var ascending_lookup = occupied & ascending;
+    var ascending_lookup = occupied_mask & ascending;
     var reverse = @byteSwap(ascending_lookup);
     ascending_lookup -= bishop_mask;
     reverse -= @byteSwap(bishop_mask);
     ascending_lookup ^= @byteSwap(reverse);
     ascending_lookup &= ascending;
 
-    var descending_lookup = occupied & descending;
+    var descending_lookup = occupied_mask & descending;
     reverse = @byteSwap(descending_lookup);
     descending_lookup -= bishop_mask;
     reverse -= @byteSwap(bishop_mask);
@@ -120,4 +123,40 @@ fn bishopLookup(bishop: Index, occupied: chess.Bitboard) chess.Bitboard {
     descending_lookup &= descending;
 
     return ascending_lookup | descending_lookup;
+}
+
+fn rookLookup(rook: Index, occupied: chess.Bitboard) chess.Bitboard {
+    @setRuntimeSafety(false);
+
+    const rook_mask = masks.one << rook;
+    const col = col_masks[rook];
+    const row = row_masks[rook];
+    const occupied_mask = occupied & ~rook_mask;
+
+    var col_lookup = occupied_mask & col;
+    var reverse = @byteSwap(col_lookup);
+    col_lookup -= rook_mask;
+    reverse -= @byteSwap(rook_mask);
+    col_lookup ^= @byteSwap(reverse);
+    col_lookup &= col;
+
+    const empty = ~occupied_mask;
+    var row_lookup = rook_mask;
+    row_lookup |= empty & (row_lookup << 1);
+    row_lookup |= empty & (row_lookup << 1);
+    row_lookup |= empty & (row_lookup << 1);
+    row_lookup |= empty & (row_lookup << 1);
+    row_lookup |= empty & (row_lookup << 1);
+    row_lookup |= empty & (row_lookup << 1);
+    row_lookup |= empty & (row_lookup << 1);
+    row_lookup |= empty & (row_lookup >> 1);
+    row_lookup |= empty & (row_lookup >> 1);
+    row_lookup |= empty & (row_lookup >> 1);
+    row_lookup |= empty & (row_lookup >> 1);
+    row_lookup |= empty & (row_lookup >> 1);
+    row_lookup |= empty & (row_lookup >> 1);
+    row_lookup |= empty & (row_lookup >> 1);
+    row_lookup &= row;
+
+    return col_lookup | row_lookup;
 }
