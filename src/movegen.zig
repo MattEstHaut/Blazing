@@ -3,7 +3,8 @@ const masks = @import("masks.zig");
 
 const Index = u6;
 
-const rook_masks = rookMasks();
+const row_masks = rowMasks();
+const col_masks = colMasks();
 const ascending_masks = ascendingMasks();
 const descending_masks = descendingMasks();
 
@@ -37,15 +38,23 @@ inline fn knightLookup(knight: chess.Bitboard) chess.Bitboard {
     return lookup;
 }
 
-fn rookMasks() [64]masks.Mask {
+fn rowMasks() [64]masks.Mask {
+    var result: [64]masks.Mask = undefined;
+    var index: Index = 0;
+    while (true) : (index += 1) {
+        const row_offset = index & 56;
+        result[index] = masks.first_row << row_offset;
+        if (index == 63) break;
+    }
+    return result;
+}
+
+fn colMasks() [64]masks.Mask {
     var result: [64]masks.Mask = undefined;
     var index: Index = 0;
     while (true) : (index += 1) {
         const col_index = index & 7;
-        const row_offset = index - col_index;
-        const col_mask = masks.first_col << col_index;
-        const row_mask = masks.first_row << row_offset;
-        result[index] = col_mask ^ row_mask;
+        result[index] = masks.first_col << col_index;
         if (index == 63) break;
     }
     return result;
