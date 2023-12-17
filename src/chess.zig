@@ -9,6 +9,10 @@ const PiecePositions = struct {
     rooks: Bitboard,
     queens: Bitboard,
     king: Bitboard,
+
+    pub inline fn occupied(self: *PiecePositions) Bitboard {
+        return self.pawns | self.knights | self.bishops | self.rooks | self.queens | self.king;
+    }
 };
 
 pub const Color = enum {
