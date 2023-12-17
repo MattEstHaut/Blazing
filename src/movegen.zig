@@ -90,3 +90,25 @@ fn descendingMasks() [64]masks.Mask {
     }
     return result;
 }
+
+fn bishopLookup(bishop: Index, occupied: chess.Bitboard) chess.Bitboard {
+    const bishop_mask = masks.one << bishop;
+    const ascending = ascending_masks[bishop];
+    const descending = descending_masks[bishop];
+
+    var ascending_lookup = occupied & ascending;
+    var reverse = @byteSwap(ascending_lookup);
+    ascending_lookup -= bishop_mask;
+    reverse -= @byteSwap(bishop_mask);
+    ascending_lookup ^= @byteSwap(reverse);
+    ascending_lookup &= ascending;
+
+    var descending_lookup = occupied & descending;
+    reverse = @byteSwap(descending_lookup);
+    descending_lookup -= bishop_mask;
+    reverse -= @byteSwap(bishop_mask);
+    descending_lookup ^= @byteSwap(reverse);
+    descending_lookup &= descending;
+
+    return ascending_lookup | descending_lookup;
+}
