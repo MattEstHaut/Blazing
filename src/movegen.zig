@@ -100,63 +100,29 @@ fn descendingMasks() [64]masks.Mask {
     return result;
 }
 
-inline fn bishopLookup(bishop: Index, occupied: chess.Bitboard) chess.Bitboard {
+inline fn hyperbolaQuintessence(s: chess.Bitboard, o: chess.Bitboard, m: masks.Mask) masks.Mask {
     @setRuntimeSafety(false);
+    return (((o & m) - 2 * s) ^ @bitReverse(@bitReverse(o & m) - 2 * @bitReverse(s))) & m;
+}
 
-    const bishop_mask = masks.one << bishop;
-    const ascending = ascending_masks[bishop];
-    const descending = descending_masks[bishop];
-    const occupied_mask = occupied & ~bishop_mask;
+inline fn bishopLookup(bishop: chess.Bitboard, occupied: chess.Bitboard) chess.Bitboard {
+    const bishop_index = @ctz(bishop);
+    const ascending_mask = ascending_masks[bishop_index];
+    const descending_mask = descending_masks[bishop_index];
 
-    var ascending_lookup = occupied_mask & ascending;
-    var reverse = @byteSwap(ascending_lookup);
-    ascending_lookup -= bishop_mask;
-    reverse -= @byteSwap(bishop_mask);
-    ascending_lookup ^= @byteSwap(reverse);
-    ascending_lookup &= ascending;
-
-    var descending_lookup = occupied_mask & descending;
-    reverse = @byteSwap(descending_lookup);
-    descending_lookup -= bishop_mask;
-    reverse -= @byteSwap(bishop_mask);
-    descending_lookup ^= @byteSwap(reverse);
-    descending_lookup &= descending;
+    const ascending_lookup = hyperbolaQuintessence(bishop, occupied, ascending_mask);
+    const descending_lookup = hyperbolaQuintessence(bishop, occupied, descending_mask);
 
     return ascending_lookup | descending_lookup;
 }
 
-inline fn rookLookup(rook: Index, occupied: chess.Bitboard) chess.Bitboard {
-    @setRuntimeSafety(false);
+pub inline fn rookLookup(rook: chess.Bitboard, occupied: chess.Bitboard) chess.Bitboard {
+    const rook_index = @ctz(rook);
+    const col_mask = col_masks[rook_index];
+    const row_mask = row_masks[rook_index];
 
-    const rook_mask = masks.one << rook;
-    const col = col_masks[rook];
-    const row = row_masks[rook];
-    const occupied_mask = occupied & ~rook_mask;
-
-    var col_lookup = occupied_mask & col;
-    var reverse = @byteSwap(col_lookup);
-    col_lookup -= rook_mask;
-    reverse -= @byteSwap(rook_mask);
-    col_lookup ^= @byteSwap(reverse);
-    col_lookup &= col;
-
-    const empty = ~occupied_mask;
-    var row_lookup = rook_mask;
-    row_lookup |= empty & (row_lookup << 1);
-    row_lookup |= empty & (row_lookup << 1);
-    row_lookup |= empty & (row_lookup << 1);
-    row_lookup |= empty & (row_lookup << 1);
-    row_lookup |= empty & (row_lookup << 1);
-    row_lookup |= empty & (row_lookup << 1);
-    row_lookup |= empty & (row_lookup << 1);
-    row_lookup |= empty & (row_lookup >> 1);
-    row_lookup |= empty & (row_lookup >> 1);
-    row_lookup |= empty & (row_lookup >> 1);
-    row_lookup |= empty & (row_lookup >> 1);
-    row_lookup |= empty & (row_lookup >> 1);
-    row_lookup |= empty & (row_lookup >> 1);
-    row_lookup |= empty & (row_lookup >> 1);
-    row_lookup &= row;
+    const col_lookup = hyperbolaQuintessence(rook, occupied, col_mask);
+    const row_lookup = hyperbolaQuintessence(rook, occupied, row_mask);
 
     return col_lookup | row_lookup;
 }
