@@ -160,3 +160,7 @@ inline fn rookLookup(rook: Index, occupied: chess.Bitboard) chess.Bitboard {
 
     return col_lookup | row_lookup;
 }
+
+inline fn queenLookup(queen: Index, occupied: chess.Bitboard) chess.Bitboard {
+    return bishopLookup(queen, occupied) | rookLookup(queen, occupied);
+}
