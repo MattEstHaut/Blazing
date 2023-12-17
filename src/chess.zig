@@ -75,33 +75,3 @@ pub const void_board = Board{
     .halfmove_clock = 0,
     .fullmove_number = 0,
 };
-
-inline fn kingLookup(king: Bitboard) Bitboard {
-    const no_left = king & masks.no_left;
-    const no_right = king & masks.no_right;
-    var lookup = king >> 8;
-    lookup |= no_left >> 9;
-    lookup |= no_left >> 1;
-    lookup |= no_left << 7;
-    lookup |= king << 8;
-    lookup |= no_right << 9;
-    lookup |= no_right << 1;
-    lookup |= no_right >> 7;
-    return lookup;
-}
-
-inline fn knightLookup(knight: Bitboard) Bitboard {
-    const no_left = knight & masks.no_left;
-    const no_left_double = knight & masks.no_left_double;
-    const no_right = knight & masks.no_right;
-    const no_right_double = knight & masks.no_right_double;
-    var lookup = no_left >> 17;
-    lookup |= no_left_double >> 10;
-    lookup |= no_left_double << 6;
-    lookup |= no_left << 15;
-    lookup |= no_right << 17;
-    lookup |= no_right_double << 10;
-    lookup |= no_right_double >> 6;
-    lookup |= no_right >> 15;
-    return lookup;
-}
