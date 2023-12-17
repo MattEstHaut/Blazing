@@ -131,14 +131,23 @@ inline fn queenLookup(queen: Index, occupied: chess.Bitboard) chess.Bitboard {
     return bishopLookup(queen, occupied) | rookLookup(queen, occupied);
 }
 
-inline fn pawnForward(pawns: chess.Bitboard, occupied: chess.Bitboard, comptime color: chess.Color) chess.Bitboard {
+inline fn pawnsForward(pawns: chess.Bitboard, occupied: chess.Bitboard, comptime color: chess.Color) chess.Bitboard {
     switch (color) {
         .white => return (pawns >> 8) & ~occupied,
         .black => return (pawns << 8) & ~occupied,
     }
 }
 
-inline fn pawnDoubleForward(pawns: chess.Bitboard, occupied: chess.Bitboard, comptime color: chess.Color) chess.Bitboard {
+inline fn pawnsDoubleForward(pawns: chess.Bitboard, occupied: chess.Bitboard, comptime color: chess.Color) chess.Bitboard {
     const pawns_double = if (color == .white) pawns & masks.last_row >> 8 else pawns & masks.first_row << 8;
-    return pawnForward(pawnForward(pawns_double, occupied, color), occupied, color);
+    return pawnsForward(pawnsForward(pawns_double, occupied, color), occupied, color);
+}
+
+inline fn pawnCaptures(pawns: chess.Bitboard, comptime color: chess.Color) chess.Bitboard {
+    const no_left = pawns & masks.no_left;
+    const no_right = pawns & masks.no_right;
+    switch (color) {
+        .white => return no_left >> 9 | no_right >> 7,
+        .black => return no_left << 7 | no_right << 9,
+    }
 }
