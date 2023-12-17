@@ -1,7 +1,7 @@
 const chess = @import("chess.zig");
 const masks = @import("masks.zig");
 
-pub const Index = u6;
+const Index = u6;
 
 const rook_masks = rookMasks();
 const ascending_masks = ascendingMasks();
