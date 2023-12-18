@@ -247,68 +247,84 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
     const top_right = hyperbolaQuintessenceReversed(king, ad_attackers, ascending_mask);
     const bottom_left = hyperbolaQuintessence(king, ad_attackers, ascending_mask);
 
-    var blockers = @popCount(top & occupied);
-    if (blockers == 1) {
-        all_masks.check |= top;
-        all_masks.checks += 1;
-    } else if (blockers == 2) {
-        all_masks.pin_ver |= top;
+    if (top & enemy.rooks != 0) {
+        const blockers = @popCount(top & occupied);
+        if (blockers == 1) {
+            all_masks.check |= top;
+            all_masks.checks += 1;
+        } else if (blockers == 2) {
+            all_masks.pin_ver |= top;
+        }
     }
 
-    blockers = @popCount(bottom & occupied);
-    if (blockers == 1) {
-        all_masks.check |= bottom;
-        all_masks.checks += 1;
-    } else if (blockers == 2) {
-        all_masks.pin_ver |= bottom;
+    if (bottom & enemy.rooks != 0) {
+        const blockers = @popCount(bottom & occupied);
+        if (blockers == 1) {
+            all_masks.check |= bottom;
+            all_masks.checks += 1;
+        } else if (blockers == 2) {
+            all_masks.pin_ver |= bottom;
+        }
     }
 
-    blockers = @popCount(left & occupied);
-    if (blockers == 1) {
-        all_masks.check |= left;
-        all_masks.checks += 1;
-    } else if (blockers == 2) {
-        all_masks.pin_hor |= left;
+    if (left & enemy.rooks != 0) {
+        const blockers = @popCount(left & occupied);
+        if (blockers == 1) {
+            all_masks.check |= left;
+            all_masks.checks += 1;
+        } else if (blockers == 2) {
+            all_masks.pin_hor |= left;
+        }
     }
 
-    blockers = @popCount(right & occupied);
-    if (blockers == 1) {
-        all_masks.check |= right;
-        all_masks.checks += 1;
-    } else if (blockers == 2) {
-        all_masks.pin_hor |= right;
+    if (right & enemy.rooks != 0) {
+        const blockers = @popCount(right & occupied);
+        if (blockers == 1) {
+            all_masks.check |= right;
+            all_masks.checks += 1;
+        } else if (blockers == 2) {
+            all_masks.pin_hor |= right;
+        }
     }
 
-    blockers = @popCount(top_left & occupied);
-    if (blockers == 1) {
-        all_masks.check |= top_left;
-        all_masks.checks += 1;
-    } else if (blockers == 2) {
-        all_masks.pin_desc |= top_left;
+    if (top_left & enemy.bishops != 0) {
+        const blockers = @popCount(top_left & occupied);
+        if (blockers == 1) {
+            all_masks.check |= top_left;
+            all_masks.checks += 1;
+        } else if (blockers == 2) {
+            all_masks.pin_desc |= top_left;
+        }
     }
 
-    blockers = @popCount(bottom_right & occupied);
-    if (blockers == 1) {
-        all_masks.check |= bottom_right;
-        all_masks.checks += 1;
-    } else if (blockers == 2) {
-        all_masks.pin_desc |= bottom_right;
+    if (bottom_right & enemy.bishops != 0) {
+        const blockers = @popCount(bottom_right & occupied);
+        if (blockers == 1) {
+            all_masks.check |= bottom_right;
+            all_masks.checks += 1;
+        } else if (blockers == 2) {
+            all_masks.pin_desc |= bottom_right;
+        }
     }
 
-    blockers = @popCount(top_right & occupied);
-    if (blockers == 1) {
-        all_masks.check |= top_right;
-        all_masks.checks += 1;
-    } else if (blockers == 2) {
-        all_masks.pin_asc |= top_right;
+    if (top_right & enemy.bishops != 0) {
+        const blockers = @popCount(top_right & occupied);
+        if (blockers == 1) {
+            all_masks.check |= top_right;
+            all_masks.checks += 1;
+        } else if (blockers == 2) {
+            all_masks.pin_asc |= top_right;
+        }
     }
 
-    blockers = @popCount(bottom_left & occupied);
-    if (blockers == 1) {
-        all_masks.check |= bottom_left;
-        all_masks.checks += 1;
-    } else if (blockers == 2) {
-        all_masks.pin_asc |= bottom_left;
+    if (bottom_left & enemy.bishops != 0) {
+        const blockers = @popCount(bottom_left & occupied);
+        if (blockers == 1) {
+            all_masks.check |= bottom_left;
+            all_masks.checks += 1;
+        } else if (blockers == 2) {
+            all_masks.pin_asc |= bottom_left;
+        }
     }
 
     if (all_masks.check == 0) all_masks.check = masks.full;
@@ -416,8 +432,8 @@ inline fn reverseColor(comptime color: chess.Color) chess.Color {
     }
 }
 
-inline fn swapSides(board: *chess.Board) void {
-    board.side_to_move = reverseColor(board.side_to_move);
+inline fn swapSides(board: *chess.Board, comptime color: chess.Color) void {
+    board.side_to_move = reverseColor(color);
     board.en_passant = 0;
     board.halfmove_clock += 1;
 }
