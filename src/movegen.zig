@@ -393,3 +393,15 @@ inline fn doPawnCapture(board: *chess.Board, src: chess.Bitboard, dest: masks.Ma
     reset(board, dest, color);
     board.castling_rights &= ~dest;
 }
+
+inline fn doPromotion(board: *chess.Board, loc: chess.Bitboard, comptime piece: Promotion, comptime color: chess.Color) void {
+    const positions = if (color == chess.Color.white) &board.white else &board.black;
+    positions.pawns ^= loc;
+    switch (piece) {
+        .queen => positions.queens |= loc,
+        .rook => positions.rooks |= loc,
+        .bishop => positions.bishops |= loc,
+        .knight => positions.knights |= loc,
+        else => unreachable,
+    }
+}
