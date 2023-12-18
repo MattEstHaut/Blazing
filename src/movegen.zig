@@ -354,7 +354,7 @@ inline fn reset(board: *chess.Board, where: masks.Mask, comptime color: chess.Co
 inline fn doKingMove(board: *chess.Board, dest: masks.Mask, comptime color: chess.Color) void {
     const positions = if (color == chess.Color.white) &board.white else &board.black;
     positions.king = dest;
-    reset(board, positions.king, color);
+    reset(board, positions.king, reverseColor(color));
 
     if (color == chess.Color.white) {
         board.castling_rights &= ~masks.castling_K;
@@ -366,14 +366,14 @@ inline fn doKingMove(board: *chess.Board, dest: masks.Mask, comptime color: ches
 inline fn doKnightMove(board: *chess.Board, src: chess.Bitboard, dest: masks.Mask, comptime color: chess.Color) void {
     const positions = if (color == chess.Color.white) &board.white else &board.black;
     positions.knights ^= src | dest;
-    reset(board, positions.knights, color);
+    reset(board, positions.knights, reverseColor(color));
     board.castling_rights &= ~dest;
 }
 
 inline fn doBishopMove(board: *chess.Board, src: chess.Bitboard, dest: masks.Mask, comptime color: chess.Color) void {
     const positions = if (color == chess.Color.white) &board.white else &board.black;
     positions.bishops ^= src | dest;
-    reset(board, positions.bishops, color);
+    reset(board, positions.bishops, reverseColor(color));
     board.castling_rights &= ~dest;
 }
 
@@ -381,14 +381,14 @@ inline fn doRookMove(board: *chess.Board, src: chess.Bitboard, dest: masks.Mask,
     const positions = if (color == chess.Color.white) &board.white else &board.black;
     const move = src | dest;
     positions.rooks ^= move;
-    reset(board, positions.rooks, color);
+    reset(board, positions.rooks, reverseColor(color));
     board.castling_rights &= ~move;
 }
 
 inline fn doQueenMove(board: *chess.Board, src: chess.Bitboard, dest: masks.Mask, comptime color: chess.Color) void {
     const positions = if (color == chess.Color.white) &board.white else &board.black;
     positions.queens ^= src | dest;
-    reset(board, positions.queens, color);
+    reset(board, positions.queens, reverseColor(color));
     board.castling_rights &= ~dest;
 }
 
@@ -409,7 +409,7 @@ inline fn doPawnCapture(board: *chess.Board, src: chess.Bitboard, dest: masks.Ma
     const positions = if (color == chess.Color.white) &board.white else &board.black;
     const move = src | dest;
     positions.pawns ^= move;
-    reset(board, dest, color);
+    reset(board, dest, reverseColor(color));
     board.castling_rights &= ~dest;
 }
 
@@ -466,7 +466,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
             var child = board;
             doKingMove(&child, dest, color);
             swapSides(&child, color);
-            nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+            nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
         }
     }
 
@@ -484,7 +484,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 var child = board;
                 doKnightMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
             }
         }
     }
@@ -505,7 +505,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 var child = board;
                 doBishopMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
             }
         }
     }
@@ -526,7 +526,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 var child = board;
                 doRookMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
             }
         }
     }
@@ -551,7 +551,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 var child = board;
                 doQueenMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
             }
         }
     }
@@ -568,15 +568,15 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
             swapSides(&child, color);
             if (dest & prom_row != 0) {
                 doPromotion(&child, dest, Promotion.queen, color);
-                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
                 doPromotion(&child, dest, Promotion.rook, color);
-                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
                 doPromotion(&child, dest, Promotion.bishop, color);
-                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
                 doPromotion(&child, dest, Promotion.knight, color);
-                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
             } else {
-                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
             }
         }
     }
@@ -589,7 +589,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
             var child = board;
             doPawnDoubleForward(&child, dest, color);
             swapSides(&child, color);
-            nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+            nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
         }
     }
 
@@ -611,15 +611,15 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 swapSides(&child, color);
                 if (dest & (masks.first_row | masks.last_row) != 0) {
                     doPromotion(&child, dest, Promotion.queen, color);
-                    nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                    nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
                     doPromotion(&child, dest, Promotion.rook, color);
-                    nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                    nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
                     doPromotion(&child, dest, Promotion.bishop, color);
-                    nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                    nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
                     doPromotion(&child, dest, Promotion.knight, color);
-                    nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                    nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
                 } else {
-                    nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+                    nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
                 }
             }
         }
@@ -634,9 +634,16 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
             swapSides(&child, color);
             const child_occupied = child.white.occupied() | child.black.occupied();
             if (isAttackedBy(child, positions.king, child_occupied, reverseColor(color))) continue;
-            nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
+            nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
         }
     }
 
     return nodes;
+}
+
+pub fn exploreEntry(board: chess.Board, depth: u64, callback: anytype, arg: anytype) u64 {
+    switch (board.side_to_move) {
+        .white => return explore(board, depth, .white, callback, arg),
+        .black => return explore(board, depth, .black, callback, arg),
+    }
 }
