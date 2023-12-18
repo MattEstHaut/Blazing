@@ -332,3 +332,22 @@ inline fn reset(board: *chess.Board, where: masks.Mask, comptime color: chess.Co
     positions.queens &= mask;
     positions.king &= mask;
 }
+
+inline fn doKingMove(board: *chess.Board, dest: masks.Mask, comptime color: chess.Color) void {
+    const positions = if (color == chess.Color.white) &board.white else &board.black;
+    positions.king = dest;
+    reset(board, positions.king, color);
+
+    if (color == chess.Color.white) {
+        board.castling_rights &= ~masks.castling_K;
+    } else {
+        board.castling_rights &= ~masks.castling_k;
+    }
+}
+
+inline fn doKnightMove(board: *chess.Board, src: chess.Bitboard, dest: masks.Mask, comptime color: chess.Color) void {
+    const positions = if (color == chess.Color.white) &board.white else &board.black;
+    positions.knights ^= src | dest;
+    reset(board, positions.knights, color);
+    board.castling_rights &= ~dest;
+}
