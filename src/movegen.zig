@@ -177,3 +177,20 @@ inline fn attackedBy(board: chess.Board, occupied: chess.Bitboard, comptime colo
 
     return attacked;
 }
+
+inline fn isAttackedBy(board: chess.Board, where: masks.Mask, occupied: chess.Bitboard, comptime color: chess.Color) bool {
+    const attackers = if (color == .white) board.white else board.black;
+    const blockers = occupied & ~(if (color == .white) board.black.king else board.white.king);
+
+    if (kingLookup(attackers.king) & where != 0) return true;
+    if (knightLookup(attackers.knights) & where != 0) return true;
+    if (pawnCaptures(attackers.pawns, color) & where != 0) return true;
+
+    const rooks = attackers.rooks | attackers.queens;
+    if (rookLookup(where, blockers) & rooks != 0) return true;
+
+    const bishops = attackers.bishops | attackers.queens;
+    if (bishopLookup(where, blockers) & bishops != 0) return true;
+
+    return false;
+}
