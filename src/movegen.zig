@@ -127,10 +127,9 @@ inline fn bishopLookup(bishop: chess.Bitboard, occupied: chess.Bitboard) chess.B
     return ascending_lookup | descending_lookup;
 }
 
-pub inline fn rookLookup(rook: chess.Bitboard, occupied: chess.Bitboard) chess.Bitboard {
+inline fn rookLookup(rook: chess.Bitboard, occupied: chess.Bitboard) chess.Bitboard {
     const rook_index = @ctz(rook);
-    // const col_mask = col_masks[rook_index];
-    // const row_mask = row_masks[rook_index];
+
     const col_mask = masks.first_col << @intCast(rook_index & 7);
     const row_mask = masks.first_row << @intCast(rook_index & 56);
 
@@ -217,7 +216,7 @@ const PinCheckMasks = struct {
     checks: u7,
 };
 
-pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, comptime color: chess.Color) PinCheckMasks {
+inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, comptime color: chess.Color) PinCheckMasks {
     const king = if (color == .white) board.white.king else board.black.king;
     const enemy = if (color == .white) board.black else board.white;
 
@@ -232,8 +231,7 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
     all_masks.pin_desc = 0;
 
     const king_index = @ctz(king);
-    // const col_mask = col_masks[king_index];
-    // const row_mask = row_masks[king_index];
+
     const col_mask = masks.first_col << @intCast(king_index & 7);
     const row_mask = masks.first_row << @intCast(king_index & 56);
     const ascending_mask = ascending_masks[king_index];
