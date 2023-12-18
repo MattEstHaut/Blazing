@@ -1,3 +1,4 @@
+const std = @import("std");
 const chess = @import("chess.zig");
 const masks = @import("masks.zig");
 
@@ -732,4 +733,42 @@ pub fn exploreEntry(board: chess.Board, depth: u64, callback: anytype, arg: anyt
         .white => return explore(board, depth, .white, callback, arg),
         .black => return explore(board, depth, .black, callback, arg),
     }
+}
+
+const max_threads = 200;
+
+const ExploreThreadArg = struct {
+    id: usize = 0,
+    threads: [max_threads]std.Thread,
+    nodes: [max_threads]u64,
+};
+
+const ExploreThreadResultArg = struct {
+    arg: *ExploreThreadArg,
+    id: usize,
+};
+
+pub fn exploreThread(board: chess.Board, depth: u64, comptime color: chess.Color, _: anytype, _: anytype) u64 {
+    const moves = explore(board, 1, color, explore, null);
+    var arg = ExploreThreadArg{ .id = 0, .threads = undefined, .nodes = undefined };
+
+    _ = explore(board, depth, color, exploreNewThread, &arg);
+
+    var nodes: u64 = 0;
+    for (0..moves) |i| {
+        arg.threads[i].join();
+        nodes += arg.nodes[i];
+    }
+
+    return nodes;
+}
+
+fn exploreNewThread(board: chess.Board, depth: u64, comptime color: chess.Color, _: anytype, arg: *ExploreThreadArg) u64 {
+    arg.threads[arg.id] = std.Thread.spawn(.{}, exploreThreadResult, .{ board, depth, color, .{ .arg = arg, .id = arg.id } }) catch unreachable;
+    arg.id += 1;
+    return 0;
+}
+
+fn exploreThreadResult(board: chess.Board, depth: u64, comptime color: chess.Color, arg: ExploreThreadResultArg) void {
+    arg.arg.nodes[arg.id] = explore(board, depth, color, explore, null);
 }
