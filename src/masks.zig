@@ -20,3 +20,22 @@ pub const castling_K: Mask = 0x9000000000000000;
 pub const castling_Q: Mask = 0x1100000000000000;
 pub const castling_k: Mask = 0x0000000000000090;
 pub const castling_q: Mask = 0x0000000000000011;
+
+const Nextbit = struct {
+    mask: Mask,
+
+    pub inline fn nextMask(self: *Nextbit) ?Mask {
+        if (self.mask == 0) return null;
+        const ret = asm (
+            \\ blsi %[src], %[ret]
+            : [ret] "=r" (-> Mask),
+            : [src] "r" (self.mask),
+        );
+        self.mask &= ~ret;
+        return ret;
+    }
+};
+
+pub inline fn nextbit(mask: Mask) Nextbit {
+    return Nextbit{ .mask = mask };
+}
