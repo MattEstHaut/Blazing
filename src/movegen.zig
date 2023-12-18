@@ -385,3 +385,11 @@ inline fn doPawnDoubleForward(board: *chess.Board, dest: masks.Mask, comptime co
     const src = if (color == chess.Color.white) dest << 16 else dest >> 16;
     positions.pawns ^= src | dest;
 }
+
+inline fn doPawnCapture(board: *chess.Board, src: chess.Bitboard, dest: masks.Mask, comptime color: chess.Color) void {
+    const positions = if (color == chess.Color.white) &board.white else &board.black;
+    const move = src | dest;
+    positions.pawns ^= move;
+    reset(board, dest, color);
+    board.castling_rights &= ~dest;
+}
