@@ -107,12 +107,12 @@ inline fn hyperbolaQuintessence(s: chess.Bitboard, o: chess.Bitboard, m: masks.M
 
 inline fn hyperbolaQuintessenceSimple(s: chess.Bitboard, o: chess.Bitboard, m: masks.Mask) masks.Mask {
     @setRuntimeSafety(false);
-    return (o & m) ^ ((o & m) - 2 * s);
+    return (o & m) ^ ((o & m) - 2 * s) & m;
 }
 
 inline fn hyperbolaQuintessenceReversed(s: chess.Bitboard, o: chess.Bitboard, m: masks.Mask) masks.Mask {
     @setRuntimeSafety(false);
-    return (o & m) ^ @bitReverse(@bitReverse(o & m) - 2 * @bitReverse(s));
+    return (o & m) ^ @bitReverse(@bitReverse(o & m) - 2 * @bitReverse(s)) & m;
 }
 
 inline fn bishopLookup(bishop: chess.Bitboard, occupied: chess.Bitboard) chess.Bitboard {
