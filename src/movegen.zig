@@ -761,12 +761,12 @@ pub fn exploreThread(board: chess.Board, depth: u64, comptime color: chess.Color
     return nodes;
 }
 
-fn exploreNewThread(board: chess.Board, depth: u64, comptime color: chess.Color, _: anytype, arg: *ExploreThreadArg) u64 {
+inline fn exploreNewThread(board: chess.Board, depth: u64, comptime color: chess.Color, _: anytype, arg: *ExploreThreadArg) u64 {
     arg.threads[arg.id] = std.Thread.spawn(.{}, exploreThreadResult, .{ board, depth, color, .{ .arg = arg, .id = arg.id } }) catch unreachable;
     arg.id += 1;
     return 0;
 }
 
-fn exploreThreadResult(board: chess.Board, depth: u64, comptime color: chess.Color, arg: ExploreThreadResultArg) void {
+inline fn exploreThreadResult(board: chess.Board, depth: u64, comptime color: chess.Color, arg: ExploreThreadResultArg) void {
     arg.arg.nodes[arg.id] = explore(board, depth, color, explore, null);
 }
