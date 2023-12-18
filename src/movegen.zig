@@ -151,3 +151,29 @@ inline fn pawnCaptures(pawns: chess.Bitboard, comptime color: chess.Color) chess
         .black => return no_left << 7 | no_right << 9,
     }
 }
+
+pub inline fn attackedBy(board: chess.Board, occupied: chess.Bitboard, comptime color: chess.Color) masks.Mask {
+    const attackers = if (color == .white) board.white else board.black;
+    const blockers = occupied & ~(if (color == .white) board.black.king else board.white.king);
+
+    var attacked = kingLookup(attackers.king);
+    attacked |= knightLookup(attackers.knights);
+    attacked |= pawnCaptures(attackers.pawns, color);
+
+    var iter = masks.nextbit(attackers.bishops);
+    while (iter.nextMask()) |bishop| {
+        attacked |= bishopLookup(bishop, blockers);
+    }
+
+    iter = masks.nextbit(attackers.rooks);
+    while (iter.nextMask()) |rook| {
+        attacked |= rookLookup(rook, blockers);
+    }
+
+    iter = masks.nextbit(attackers.queens);
+    while (iter.nextMask()) |queen| {
+        attacked |= queenLookup(queen, blockers);
+    }
+
+    return attacked;
+}
