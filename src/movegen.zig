@@ -105,6 +105,16 @@ inline fn hyperbolaQuintessence(s: chess.Bitboard, o: chess.Bitboard, m: masks.M
     return (((o & m) - 2 * s) ^ @bitReverse(@bitReverse(o & m) - 2 * @bitReverse(s))) & m;
 }
 
+inline fn hyperbolaQuintessenceSimple(s: chess.Bitboard, o: chess.Bitboard, m: masks.Mask) masks.Mask {
+    @setRuntimeSafety(false);
+    return (o & m) ^ ((o & m) - 2 * s);
+}
+
+inline fn hyperbolaQuintessenceReversed(s: chess.Bitboard, o: chess.Bitboard, m: masks.Mask) masks.Mask {
+    @setRuntimeSafety(false);
+    return (o & m) ^ @bitReverse(@bitReverse(o & m) - 2 * @bitReverse(s));
+}
+
 inline fn bishopLookup(bishop: chess.Bitboard, occupied: chess.Bitboard) chess.Bitboard {
     const bishop_index = @ctz(bishop);
     const ascending_mask = ascending_masks[bishop_index];
