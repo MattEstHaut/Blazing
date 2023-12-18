@@ -437,3 +437,189 @@ inline fn swapSides(board: *chess.Board, comptime color: chess.Color) void {
     board.en_passant = 0;
     board.halfmove_clock += 1;
 }
+
+fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Color) u64 {
+    if (depth == 0) return 1;
+    var nodes: u64 = 0;
+
+    const positions = if (color == chess.Color.white) board.white else board.black;
+    const enemy = if (color == chess.Color.white) board.black.occupied() else board.white.occupied();
+    const occupied = positions.occupied() | enemy;
+    const empty_or_enemy = ~occupied | enemy;
+
+    const pin_and_check = createPinCheckMasks(board, occupied, color);
+
+    {
+        const lookup = kingLookup(positions.king) & empty_or_enemy;
+        var dest_iter = masks.nextbit(lookup);
+        while (dest_iter.nextMask()) |dest| {
+            if (isAttackedBy(board, dest, occupied, reverseColor(color))) continue;
+            var child = board;
+            doKingMove(&child, dest, color);
+            swapSides(&child, color);
+            nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+        }
+    }
+
+    if (pin_and_check.checks > 1) return nodes;
+
+    const pin_hv = pin_and_check.pin_hor | pin_and_check.pin_ver;
+    const pin_ad = pin_and_check.pin_asc | pin_and_check.pin_desc;
+
+    {
+        var src_iter = masks.nextbit(positions.knights & ~(pin_hv | pin_ad));
+        while (src_iter.nextMask()) |src| {
+            const lookup = knightLookup(src) & empty_or_enemy & pin_and_check.check;
+            var dest_iter = masks.nextbit(lookup);
+            while (dest_iter.nextMask()) |dest| {
+                var child = board;
+                doKnightMove(&child, src, dest, color);
+                swapSides(&child, color);
+                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+            }
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.bishops & ~pin_hv);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_asc & src != 0) {
+                pin_mask = pin_and_check.pin_asc;
+            } else if (pin_and_check.pin_desc & src != 0) {
+                pin_mask = pin_and_check.pin_desc;
+            }
+
+            const lookup = bishopLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
+            var dest_iter = masks.nextbit(lookup);
+            while (dest_iter.nextMask()) |dest| {
+                var child = board;
+                doBishopMove(&child, src, dest, color);
+                swapSides(&child, color);
+                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+            }
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.rooks & ~pin_ad);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_hor & src != 0) {
+                pin_mask = pin_and_check.pin_hor;
+            } else if (pin_and_check.pin_ver & src != 0) {
+                pin_mask = pin_and_check.pin_ver;
+            }
+
+            const lookup = rookLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
+            var dest_iter = masks.nextbit(lookup);
+            while (dest_iter.nextMask()) |dest| {
+                var child = board;
+                doRookMove(&child, src, dest, color);
+                swapSides(&child, color);
+                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+            }
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.queens);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_hor & src != 0) {
+                pin_mask = pin_and_check.pin_hor;
+            } else if (pin_and_check.pin_ver & src != 0) {
+                pin_mask = pin_and_check.pin_ver;
+            } else if (pin_and_check.pin_asc & src != 0) {
+                pin_mask = pin_and_check.pin_asc;
+            } else if (pin_and_check.pin_desc & src != 0) {
+                pin_mask = pin_and_check.pin_desc;
+            }
+
+            const lookup = queenLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
+            var dest_iter = masks.nextbit(lookup);
+            while (dest_iter.nextMask()) |dest| {
+                var child = board;
+                doQueenMove(&child, src, dest, color);
+                swapSides(&child, color);
+                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+            }
+        }
+    }
+
+    {
+        const prom_row = if (color == chess.Color.white) masks.first_row else masks.last_row;
+
+        var src_iter = masks.nextbit(positions.pawns & ~(pin_ad | pin_and_check.pin_hor));
+        while (src_iter.nextMask()) |src| {
+            const dest = pawnsForward(src, occupied, color) & pin_and_check.check;
+            var child = board;
+            doPawnForward(&child, dest, color);
+            swapSides(&child, color);
+            if (dest & prom_row != 0) {
+                doPromotion(&child, dest, Promotion.queen, color);
+                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                doPromotion(&child, dest, Promotion.rook, color);
+                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                doPromotion(&child, dest, Promotion.bishop, color);
+                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                doPromotion(&child, dest, Promotion.knight, color);
+                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+            } else {
+                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+            }
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.pawns & ~(pin_ad | pin_and_check.pin_hor));
+        while (src_iter.nextMask()) |src| {
+            const dest = pawnsDoubleForward(src, occupied, color) & pin_and_check.check;
+            var child = board;
+            doPawnDoubleForward(&child, dest, color);
+            swapSides(&child, color);
+            nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.pawns & ~pin_hv);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_asc & src != 0) {
+                pin_mask = pin_and_check.pin_asc;
+            } else if (pin_and_check.pin_desc & src != 0) {
+                pin_mask = pin_and_check.pin_desc;
+            }
+
+            const lookup = pawnCaptures(src, color) & pin_and_check.check & pin_mask & enemy;
+            var dest_iter = masks.nextbit(lookup);
+            while (dest_iter.nextMask()) |dest| {
+                var child = board;
+                doPawnCapture(&child, src, dest, color);
+                swapSides(&child, color);
+                if (dest & (masks.first_row | masks.last_row) != 0) {
+                    doPromotion(&child, dest, Promotion.queen, color);
+                    nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                    doPromotion(&child, dest, Promotion.rook, color);
+                    nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                    doPromotion(&child, dest, Promotion.bishop, color);
+                    nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                    doPromotion(&child, dest, Promotion.knight, color);
+                    nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                } else {
+                    nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                }
+            }
+        }
+    }
+
+    return nodes;
+}
+
+pub fn simplePerft(board: chess.Board, depth: u64) u64 {
+    switch (board.side_to_move) {
+        .white => return simplePerftRecursion(board, depth, .white),
+        .black => return simplePerftRecursion(board, depth, .black),
+    }
+}
