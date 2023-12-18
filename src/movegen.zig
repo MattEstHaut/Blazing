@@ -204,3 +204,112 @@ inline fn isAttackedBy(board: chess.Board, where: masks.Mask, occupied: chess.Bi
 
     return false;
 }
+
+const PinCheckMasks = struct {
+    check: masks.Mask,
+    pin_hor: masks.Mask,
+    pin_ver: masks.Mask,
+    pin_asc: masks.Mask,
+    pin_desc: masks.Mask,
+    checks: u7,
+};
+
+pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, comptime color: chess.Color) PinCheckMasks {
+    const king = if (color == .white) board.white.king else board.black.king;
+    const enemy = if (color == .white) board.black else board.white;
+
+    var all_masks: PinCheckMasks = undefined;
+    all_masks.check = knightLookup(king) & enemy.knights;
+    all_masks.check |= pawnCaptures(king, color) & enemy.pawns;
+    all_masks.checks = @popCount(all_masks.check);
+
+    all_masks.pin_hor = 0;
+    all_masks.pin_ver = 0;
+    all_masks.pin_asc = 0;
+    all_masks.pin_desc = 0;
+
+    const king_index = @ctz(king);
+    const col_mask = col_masks[king_index];
+    const row_mask = row_masks[king_index];
+    const ascending_mask = ascending_masks[king_index];
+    const descending_mask = descending_masks[king_index];
+
+    const hv_attackers = enemy.rooks | enemy.queens;
+    const ad_attackers = enemy.bishops | enemy.queens;
+
+    const top = hyperbolaQuintessenceReversed(king, hv_attackers, col_mask);
+    const bottom = hyperbolaQuintessence(king, hv_attackers, col_mask);
+    const left = hyperbolaQuintessenceReversed(king, hv_attackers, row_mask);
+    const right = hyperbolaQuintessence(king, hv_attackers, row_mask);
+
+    const top_left = hyperbolaQuintessenceReversed(king, ad_attackers, descending_mask);
+    const bottom_right = hyperbolaQuintessence(king, ad_attackers, descending_mask);
+    const top_right = hyperbolaQuintessenceReversed(king, ad_attackers, ascending_mask);
+    const bottom_left = hyperbolaQuintessence(king, ad_attackers, ascending_mask);
+
+    var blockers = @popCount(top & occupied);
+    if (blockers == 1) {
+        all_masks.check |= top;
+        all_masks.checks += 1;
+    } else if (blockers == 2) {
+        all_masks.pin_ver |= top;
+    }
+
+    blockers = @popCount(bottom & occupied);
+    if (blockers == 1) {
+        all_masks.check |= bottom;
+        all_masks.checks += 1;
+    } else if (blockers == 2) {
+        all_masks.pin_ver |= bottom;
+    }
+
+    blockers = @popCount(left & occupied);
+    if (blockers == 1) {
+        all_masks.check |= left;
+        all_masks.checks += 1;
+    } else if (blockers == 2) {
+        all_masks.pin_hor |= left;
+    }
+
+    blockers = @popCount(right & occupied);
+    if (blockers == 1) {
+        all_masks.check |= right;
+        all_masks.checks += 1;
+    } else if (blockers == 2) {
+        all_masks.pin_hor |= right;
+    }
+
+    blockers = @popCount(top_left & occupied);
+    if (blockers == 1) {
+        all_masks.check |= top_left;
+        all_masks.checks += 1;
+    } else if (blockers == 2) {
+        all_masks.pin_desc |= top_left;
+    }
+
+    blockers = @popCount(bottom_right & occupied);
+    if (blockers == 1) {
+        all_masks.check |= bottom_right;
+        all_masks.checks += 1;
+    } else if (blockers == 2) {
+        all_masks.pin_desc |= bottom_right;
+    }
+
+    blockers = @popCount(top_right & occupied);
+    if (blockers == 1) {
+        all_masks.check |= top_right;
+        all_masks.checks += 1;
+    } else if (blockers == 2) {
+        all_masks.pin_asc |= top_right;
+    }
+
+    blockers = @popCount(bottom_left & occupied);
+    if (blockers == 1) {
+        all_masks.check |= bottom_left;
+        all_masks.checks += 1;
+    } else if (blockers == 2) {
+        all_masks.pin_asc |= bottom_left;
+    }
+
+    return all_masks;
+}
