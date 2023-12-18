@@ -351,3 +351,25 @@ inline fn doKnightMove(board: *chess.Board, src: chess.Bitboard, dest: masks.Mas
     reset(board, positions.knights, color);
     board.castling_rights &= ~dest;
 }
+
+inline fn doBishopMove(board: *chess.Board, src: chess.Bitboard, dest: masks.Mask, comptime color: chess.Color) void {
+    const positions = if (color == chess.Color.white) &board.white else &board.black;
+    positions.bishops ^= src | dest;
+    reset(board, positions.bishops, color);
+    board.castling_rights &= ~dest;
+}
+
+inline fn doRookMove(board: *chess.Board, src: chess.Bitboard, dest: masks.Mask, comptime color: chess.Color) void {
+    const positions = if (color == chess.Color.white) &board.white else &board.black;
+    const move = src | dest;
+    positions.rooks ^= move;
+    reset(board, positions.rooks, color);
+    board.castling_rights &= ~move;
+}
+
+inline fn doQueenMove(board: *chess.Board, src: chess.Bitboard, dest: masks.Mask, comptime color: chess.Color) void {
+    const positions = if (color == chess.Color.white) &board.white else &board.black;
+    positions.queens ^= src | dest;
+    reset(board, positions.queens, color);
+    board.castling_rights &= ~dest;
+}
