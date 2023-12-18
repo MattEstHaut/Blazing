@@ -175,3 +175,10 @@ pub fn parse(fen: [*:0]const u8) !chess.Board {
 
     return board;
 }
+
+pub fn maskToSquare(mask: masks.Mask) [2]u8 {
+    const index = @ctz(mask);
+    const col = index & 7;
+    const row = index / 8;
+    return [2]u8{ 'a' + col, '8' - row };
+}
