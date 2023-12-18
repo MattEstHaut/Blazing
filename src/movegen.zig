@@ -128,8 +128,10 @@ inline fn bishopLookup(bishop: chess.Bitboard, occupied: chess.Bitboard) chess.B
 
 pub inline fn rookLookup(rook: chess.Bitboard, occupied: chess.Bitboard) chess.Bitboard {
     const rook_index = @ctz(rook);
-    const col_mask = col_masks[rook_index];
-    const row_mask = row_masks[rook_index];
+    // const col_mask = col_masks[rook_index];
+    // const row_mask = row_masks[rook_index];
+    const col_mask = masks.first_col << @intCast(rook_index & 7);
+    const row_mask = masks.first_row << @intCast(rook_index & 56);
 
     const col_lookup = hyperbolaQuintessence(rook, occupied, col_mask);
     const row_lookup = hyperbolaQuintessence(rook, occupied, row_mask);
@@ -229,8 +231,10 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
     all_masks.pin_desc = 0;
 
     const king_index = @ctz(king);
-    const col_mask = col_masks[king_index];
-    const row_mask = row_masks[king_index];
+    // const col_mask = col_masks[king_index];
+    // const row_mask = row_masks[king_index];
+    const col_mask = masks.first_col << @intCast(king_index & 7);
+    const row_mask = masks.first_row << @intCast(king_index & 56);
     const ascending_mask = ascending_masks[king_index];
     const descending_mask = descending_masks[king_index];
 
@@ -238,14 +242,14 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
     const ad_attackers = enemy.bishops | enemy.queens;
 
     const top = hyperbolaQuintessenceReversed(king, hv_attackers, col_mask);
-    const bottom = hyperbolaQuintessence(king, hv_attackers, col_mask);
+    const bottom = hyperbolaQuintessenceSimple(king, hv_attackers, col_mask);
     const left = hyperbolaQuintessenceReversed(king, hv_attackers, row_mask);
-    const right = hyperbolaQuintessence(king, hv_attackers, row_mask);
+    const right = hyperbolaQuintessenceSimple(king, hv_attackers, row_mask);
 
     const top_left = hyperbolaQuintessenceReversed(king, ad_attackers, descending_mask);
-    const bottom_right = hyperbolaQuintessence(king, ad_attackers, descending_mask);
+    const bottom_right = hyperbolaQuintessenceSimple(king, ad_attackers, descending_mask);
     const top_right = hyperbolaQuintessenceReversed(king, ad_attackers, ascending_mask);
-    const bottom_left = hyperbolaQuintessence(king, ad_attackers, ascending_mask);
+    const bottom_left = hyperbolaQuintessenceSimple(king, ad_attackers, ascending_mask);
 
     if (top & hv_attackers != 0) {
         const blockers = @popCount(top & occupied);
@@ -429,7 +433,7 @@ inline fn doEnPassant(board: *chess.Board, src: chess.Bitboard, comptime color: 
     const positions = if (color == chess.Color.white) &board.white else &board.black;
     const dest = board.en_passant;
     positions.pawns ^= src | dest;
-    const captured = if (color == chess.Color.white) dest >> 8 else dest << 8;
+    const captured = if (color == chess.Color.white) dest << 8 else dest >> 8;
     const enemy = if (color == chess.Color.white) &board.black else &board.white;
     enemy.pawns ^= captured;
 }
@@ -443,7 +447,7 @@ inline fn reverseColor(comptime color: chess.Color) chess.Color {
 
 inline fn swapSides(board: *chess.Board, comptime color: chess.Color) void {
     board.side_to_move = reverseColor(color);
-    board.en_passant = 0;
+    board.en_passant &= if (color == chess.Color.white) masks.last_row >> 16 else masks.first_row << 16;
     board.halfmove_clock += 1;
 }
 
@@ -567,14 +571,18 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
             doPawnForward(&child, dest, color);
             swapSides(&child, color);
             if (dest & prom_row != 0) {
-                doPromotion(&child, dest, Promotion.queen, color);
-                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
-                doPromotion(&child, dest, Promotion.rook, color);
-                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
-                doPromotion(&child, dest, Promotion.bishop, color);
-                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
-                doPromotion(&child, dest, Promotion.knight, color);
-                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                var child_queen = child;
+                doPromotion(&child_queen, dest, Promotion.queen, color);
+                nodes += callback(child_queen, depth - 1, reverseColor(color), callback, arg);
+                var child_rook = child;
+                doPromotion(&child_rook, dest, Promotion.rook, color);
+                nodes += callback(child_rook, depth - 1, reverseColor(color), callback, arg);
+                var child_bishop = child;
+                doPromotion(&child_bishop, dest, Promotion.bishop, color);
+                nodes += callback(child_bishop, depth - 1, reverseColor(color), callback, arg);
+                var child_knight = child;
+                doPromotion(&child_knight, dest, Promotion.knight, color);
+                nodes += callback(child_knight, depth - 1, reverseColor(color), callback, arg);
             } else {
                 nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
             }
@@ -610,14 +618,18 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 doPawnCapture(&child, src, dest, color);
                 swapSides(&child, color);
                 if (dest & (masks.first_row | masks.last_row) != 0) {
-                    doPromotion(&child, dest, Promotion.queen, color);
-                    nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
-                    doPromotion(&child, dest, Promotion.rook, color);
-                    nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
-                    doPromotion(&child, dest, Promotion.bishop, color);
-                    nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
-                    doPromotion(&child, dest, Promotion.knight, color);
-                    nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                    var child_queen = child;
+                    doPromotion(&child_queen, dest, Promotion.queen, color);
+                    nodes += callback(child_queen, depth - 1, reverseColor(color), callback, arg);
+                    var child_rook = child;
+                    doPromotion(&child_rook, dest, Promotion.rook, color);
+                    nodes += callback(child_rook, depth - 1, reverseColor(color), callback, arg);
+                    var child_bishop = child;
+                    doPromotion(&child_bishop, dest, Promotion.bishop, color);
+                    nodes += callback(child_bishop, depth - 1, reverseColor(color), callback, arg);
+                    var child_knight = child;
+                    doPromotion(&child_knight, dest, Promotion.knight, color);
+                    nodes += callback(child_knight, depth - 1, reverseColor(color), callback, arg);
                 } else {
                     nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
                 }
@@ -629,12 +641,85 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
         const lookup = pawnCaptures(board.en_passant & pin_and_check.check, reverseColor(color));
         var src_iter = masks.nextbit(positions.pawns & ~pin_hv & lookup);
         while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_asc & src != 0) {
+                pin_mask = pin_and_check.pin_asc;
+            } else if (pin_and_check.pin_desc & src != 0) {
+                pin_mask = pin_and_check.pin_desc;
+            }
+
             var child = board;
             doEnPassant(&child, src, color);
             swapSides(&child, color);
             const child_occupied = child.white.occupied() | child.black.occupied();
             if (isAttackedBy(child, positions.king, child_occupied, reverseColor(color))) continue;
             nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+        }
+    }
+
+    {
+        if (color == chess.Color.white) {
+            if (board.castling_rights & masks.castling_K == masks.castling_K) {
+                if (occupied & (masks.one << 61 | masks.one << 62) == 0) {
+                    if (!isAttackedBy(board, masks.one << 60, occupied, reverseColor(color))) {
+                        if (!isAttackedBy(board, masks.one << 61, occupied, reverseColor(color))) {
+                            if (!isAttackedBy(board, masks.one << 62, occupied, reverseColor(color))) {
+                                var child = board;
+                                doKingMove(&child, masks.one << 62, color);
+                                doRookMove(&child, masks.one << 63, masks.one << 61, color);
+                                swapSides(&child, color);
+                                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                            }
+                        }
+                    }
+                }
+            }
+            if (board.castling_rights & masks.castling_Q == masks.castling_Q) {
+                if (occupied & (masks.one << 59 | masks.one << 58 | masks.one << 57) == 0) {
+                    if (!isAttackedBy(board, masks.one << 60, occupied, reverseColor(color))) {
+                        if (!isAttackedBy(board, masks.one << 59, occupied, reverseColor(color))) {
+                            if (!isAttackedBy(board, masks.one << 58, occupied, reverseColor(color))) {
+                                var child = board;
+                                doKingMove(&child, masks.one << 58, color);
+                                doRookMove(&child, masks.one << 56, masks.one << 59, color);
+                                swapSides(&child, color);
+                                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            if (board.castling_rights & masks.castling_k == masks.castling_k) {
+                if (occupied & (masks.one << 5 | masks.one << 6) == 0) {
+                    if (!isAttackedBy(board, masks.one << 4, occupied, reverseColor(color))) {
+                        if (!isAttackedBy(board, masks.one << 5, occupied, reverseColor(color))) {
+                            if (!isAttackedBy(board, masks.one << 6, occupied, reverseColor(color))) {
+                                var child = board;
+                                doKingMove(&child, masks.one << 6, color);
+                                doRookMove(&child, masks.one << 7, masks.one << 5, color);
+                                swapSides(&child, color);
+                                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                            }
+                        }
+                    }
+                }
+            }
+            if (board.castling_rights & masks.castling_q == masks.castling_q) {
+                if (occupied & (masks.one << 3 | masks.one << 2 | masks.one << 1) == 0) {
+                    if (!isAttackedBy(board, masks.one << 2, occupied, reverseColor(color))) {
+                        if (!isAttackedBy(board, masks.one << 3, occupied, reverseColor(color))) {
+                            if (!isAttackedBy(board, masks.one << 4, occupied, reverseColor(color))) {
+                                var child = board;
+                                doKingMove(&child, masks.one << 2, color);
+                                doRookMove(&child, masks.one << 0, masks.one << 3, color);
+                                swapSides(&child, color);
+                                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
