@@ -247,7 +247,7 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
     const top_right = hyperbolaQuintessenceReversed(king, ad_attackers, ascending_mask);
     const bottom_left = hyperbolaQuintessence(king, ad_attackers, ascending_mask);
 
-    if (top & enemy.rooks != 0) {
+    if (top & hv_attackers != 0) {
         const blockers = @popCount(top & occupied);
         if (blockers == 1) {
             all_masks.check |= top;
@@ -257,7 +257,7 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
         }
     }
 
-    if (bottom & enemy.rooks != 0) {
+    if (bottom & hv_attackers != 0) {
         const blockers = @popCount(bottom & occupied);
         if (blockers == 1) {
             all_masks.check |= bottom;
@@ -267,7 +267,7 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
         }
     }
 
-    if (left & enemy.rooks != 0) {
+    if (left & hv_attackers != 0) {
         const blockers = @popCount(left & occupied);
         if (blockers == 1) {
             all_masks.check |= left;
@@ -277,7 +277,7 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
         }
     }
 
-    if (right & enemy.rooks != 0) {
+    if (right & hv_attackers != 0) {
         const blockers = @popCount(right & occupied);
         if (blockers == 1) {
             all_masks.check |= right;
@@ -287,7 +287,7 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
         }
     }
 
-    if (top_left & enemy.bishops != 0) {
+    if (top_left & ad_attackers != 0) {
         const blockers = @popCount(top_left & occupied);
         if (blockers == 1) {
             all_masks.check |= top_left;
@@ -297,7 +297,7 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
         }
     }
 
-    if (bottom_right & enemy.bishops != 0) {
+    if (bottom_right & ad_attackers != 0) {
         const blockers = @popCount(bottom_right & occupied);
         if (blockers == 1) {
             all_masks.check |= bottom_right;
@@ -307,7 +307,7 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
         }
     }
 
-    if (top_right & enemy.bishops != 0) {
+    if (top_right & ad_attackers != 0) {
         const blockers = @popCount(top_right & occupied);
         if (blockers == 1) {
             all_masks.check |= top_right;
@@ -317,7 +317,7 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
         }
     }
 
-    if (bottom_left & enemy.bishops != 0) {
+    if (bottom_left & ad_attackers != 0) {
         const blockers = @popCount(bottom_left & occupied);
         if (blockers == 1) {
             all_masks.check |= bottom_left;
