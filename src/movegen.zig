@@ -321,3 +321,14 @@ const Promotion = enum {
     knight,
     none,
 };
+
+pub inline fn reset(board: *chess.Board, where: masks.Mask, comptime color: chess.Color) void {
+    const positions = if (color == chess.Color.white) &board.white else &board.black;
+    const mask = ~where;
+    positions.pawns &= mask;
+    positions.knights &= mask;
+    positions.bishops &= mask;
+    positions.rooks &= mask;
+    positions.queens &= mask;
+    positions.king &= mask;
+}
