@@ -406,3 +406,16 @@ inline fn doPromotion(board: *chess.Board, loc: chess.Bitboard, comptime piece: 
         else => unreachable,
     }
 }
+
+inline fn reverseColor(comptime color: chess.Color) chess.Color {
+    switch (color) {
+        .white => return .black,
+        .black => return .white,
+    }
+}
+
+inline fn swapSides(board: *chess.Board) void {
+    board.side_to_move = reverseColor(board.side_to_move);
+    board.en_passant = 0;
+    board.halfmove_clock += 1;
+}
