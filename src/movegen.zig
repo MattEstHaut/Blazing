@@ -728,10 +728,10 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
     return nodes;
 }
 
-pub fn exploreEntry(board: chess.Board, depth: u64, callback: anytype, arg: anytype) u64 {
+pub fn exploreEntry(explorer: anytype, board: chess.Board, depth: u64, callback: anytype, arg: anytype) u64 {
     switch (board.side_to_move) {
-        .white => return explore(board, depth, .white, callback, arg),
-        .black => return explore(board, depth, .black, callback, arg),
+        .white => return explorer(board, depth, .white, callback, arg),
+        .black => return explorer(board, depth, .black, callback, arg),
     }
 }
 
