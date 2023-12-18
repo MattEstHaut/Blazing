@@ -311,6 +311,8 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
         all_masks.pin_asc |= bottom_left;
     }
 
+    if (all_masks.check == 0) all_masks.check = masks.full;
+
     return all_masks;
 }
 
