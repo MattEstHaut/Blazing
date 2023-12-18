@@ -447,7 +447,7 @@ inline fn swapSides(board: *chess.Board, comptime color: chess.Color) void {
     board.halfmove_clock += 1;
 }
 
-fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Color) u64 {
+pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, callback: anytype, arg: anytype) u64 {
     if (depth == 0) return 1;
     var nodes: u64 = 0;
 
@@ -466,7 +466,7 @@ fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Co
             var child = board;
             doKingMove(&child, dest, color);
             swapSides(&child, color);
-            nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+            nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
         }
     }
 
@@ -484,7 +484,7 @@ fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Co
                 var child = board;
                 doKnightMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
             }
         }
     }
@@ -505,7 +505,7 @@ fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Co
                 var child = board;
                 doBishopMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
             }
         }
     }
@@ -526,7 +526,7 @@ fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Co
                 var child = board;
                 doRookMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
             }
         }
     }
@@ -551,7 +551,7 @@ fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Co
                 var child = board;
                 doQueenMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
             }
         }
     }
@@ -562,20 +562,21 @@ fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Co
         var src_iter = masks.nextbit(positions.pawns & ~(pin_ad | pin_and_check.pin_hor));
         while (src_iter.nextMask()) |src| {
             const dest = pawnsForward(src, occupied, color) & pin_and_check.check;
+            if (dest == 0) continue;
             var child = board;
             doPawnForward(&child, dest, color);
             swapSides(&child, color);
             if (dest & prom_row != 0) {
                 doPromotion(&child, dest, Promotion.queen, color);
-                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
                 doPromotion(&child, dest, Promotion.rook, color);
-                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
                 doPromotion(&child, dest, Promotion.bishop, color);
-                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
                 doPromotion(&child, dest, Promotion.knight, color);
-                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
             } else {
-                nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
             }
         }
     }
@@ -584,10 +585,11 @@ fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Co
         var src_iter = masks.nextbit(positions.pawns & ~(pin_ad | pin_and_check.pin_hor));
         while (src_iter.nextMask()) |src| {
             const dest = pawnsDoubleForward(src, occupied, color) & pin_and_check.check;
+            if (dest == 0) continue;
             var child = board;
             doPawnDoubleForward(&child, dest, color);
             swapSides(&child, color);
-            nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+            nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
         }
     }
 
@@ -609,15 +611,15 @@ fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Co
                 swapSides(&child, color);
                 if (dest & (masks.first_row | masks.last_row) != 0) {
                     doPromotion(&child, dest, Promotion.queen, color);
-                    nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                    nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
                     doPromotion(&child, dest, Promotion.rook, color);
-                    nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                    nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
                     doPromotion(&child, dest, Promotion.bishop, color);
-                    nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                    nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
                     doPromotion(&child, dest, Promotion.knight, color);
-                    nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                    nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
                 } else {
-                    nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+                    nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
                 }
             }
         }
@@ -632,16 +634,9 @@ fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Co
             swapSides(&child, color);
             const child_occupied = child.white.occupied() | child.black.occupied();
             if (isAttackedBy(child, positions.king, child_occupied, reverseColor(color))) continue;
-            nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+            nodes += explore(child, depth - 1, reverseColor(color), callback, arg);
         }
     }
 
     return nodes;
-}
-
-pub fn simplePerft(board: chess.Board, depth: u64) u64 {
-    switch (board.side_to_move) {
-        .white => return simplePerftRecursion(board, depth, .white),
-        .black => return simplePerftRecursion(board, depth, .black),
-    }
 }
