@@ -425,6 +425,15 @@ inline fn doPromotion(board: *chess.Board, loc: chess.Bitboard, comptime piece: 
     }
 }
 
+inline fn doEnPassant(board: *chess.Board, src: chess.Bitboard, comptime color: chess.Color) void {
+    const positions = if (color == chess.Color.white) &board.white else &board.black;
+    const dest = board.en_passant;
+    positions.pawns ^= src | dest;
+    const captured = if (color == chess.Color.white) dest >> 8 else dest << 8;
+    const enemy = if (color == chess.Color.white) &board.black else &board.white;
+    enemy.pawns ^= captured;
+}
+
 inline fn reverseColor(comptime color: chess.Color) chess.Color {
     switch (color) {
         .white => return .black,
