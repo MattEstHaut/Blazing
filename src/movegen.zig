@@ -461,6 +461,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
     const empty_or_enemy = ~occupied | enemy;
 
     const pin_and_check = createPinCheckMasks(board, occupied, color);
+    const en_passant_check = (pawnsForward(pin_and_check.check, 0, color) & board.en_passant) | pin_and_check.check;
 
     {
         const lookup = kingLookup(positions.king) & empty_or_enemy;
@@ -638,7 +639,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
     }
 
     {
-        const lookup = pawnCaptures(board.en_passant & pin_and_check.check, reverseColor(color));
+        const lookup = pawnCaptures(board.en_passant & en_passant_check, reverseColor(color));
         var src_iter = masks.nextbit(positions.pawns & ~pin_hv & lookup);
         while (src_iter.nextMask()) |src| {
             var pin_mask: masks.Mask = masks.full;
