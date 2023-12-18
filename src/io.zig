@@ -168,7 +168,7 @@ pub fn parse(fen: [*:0]const u8) !chess.Board {
     } else {
         const rank = try iter.next();
         if (file < 'a' or 'h' < file or (rank != '3' and rank != '6')) return FenError.InvalidEnPassant;
-        board.en_passant = @intCast(file - 'a' + ('8' - rank) * 8);
+        board.en_passant = @as(u64, 1) << @as(u6, @intCast(file - 'a' + ('8' - rank) * 8));
     }
 
     if (!(iter.look() == ' ' or iter.end())) return FenError.InvalidCharacter;
