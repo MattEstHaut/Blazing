@@ -152,7 +152,7 @@ inline fn pawnCaptures(pawns: chess.Bitboard, comptime color: chess.Color) chess
     }
 }
 
-pub inline fn attackedBy(board: chess.Board, occupied: chess.Bitboard, comptime color: chess.Color) masks.Mask {
+inline fn attackedBy(board: chess.Board, occupied: chess.Bitboard, comptime color: chess.Color) masks.Mask {
     const attackers = if (color == .white) board.white else board.black;
     const blockers = occupied & ~(if (color == .white) board.black.king else board.white.king);
 
