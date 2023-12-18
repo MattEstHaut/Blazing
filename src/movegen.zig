@@ -623,6 +623,19 @@ fn simplePerftRecursion(board: chess.Board, depth: u64, comptime color: chess.Co
         }
     }
 
+    {
+        const lookup = pawnCaptures(board.en_passant & pin_and_check.check, reverseColor(color));
+        var src_iter = masks.nextbit(positions.pawns & ~pin_hv & lookup);
+        while (src_iter.nextMask()) |src| {
+            var child = board;
+            doEnPassant(&child, src, color);
+            swapSides(&child, color);
+            const child_occupied = child.white.occupied() | child.black.occupied();
+            if (isAttackedBy(child, positions.king, child_occupied, reverseColor(color))) continue;
+            nodes += simplePerftRecursion(child, depth - 1, reverseColor(color));
+        }
+    }
+
     return nodes;
 }
 
