@@ -322,7 +322,7 @@ const Promotion = enum {
     none,
 };
 
-pub inline fn reset(board: *chess.Board, where: masks.Mask, comptime color: chess.Color) void {
+inline fn reset(board: *chess.Board, where: masks.Mask, comptime color: chess.Color) void {
     const positions = if (color == chess.Color.white) &board.white else &board.black;
     const mask = ~where;
     positions.pawns &= mask;
