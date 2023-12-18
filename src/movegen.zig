@@ -313,3 +313,11 @@ pub inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, 
 
     return all_masks;
 }
+
+const Promotion = enum {
+    queen,
+    rook,
+    bishop,
+    knight,
+    none,
+};
