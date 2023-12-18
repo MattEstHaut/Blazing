@@ -8,7 +8,7 @@ pub fn perftInfo(fen: [*:0]const u8, depth: u64) !void {
 
     const t0 = std.time.nanoTimestamp();
     const nodes = movegen.exploreEntry(board, depth, perftInfoDetails, board);
-    const dt = std.time.nanoTimestamp() - t0;
+    const dt: u64 = @intCast(std.time.nanoTimestamp() - t0);
 
     const mn_per_100_sec: f64 = @floatFromInt(nodes * 1000 * 100 / dt);
     const mnodes_per_s: f64 = mn_per_100_sec / 100;
