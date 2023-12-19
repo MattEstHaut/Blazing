@@ -344,8 +344,8 @@ pub const Promotion = enum {
 };
 
 pub const Move = struct {
-    src: masks.Mask,
-    dest: masks.Mask,
+    from: masks.Mask,
+    to: masks.Mask,
     promotion: Promotion,
 };
 
