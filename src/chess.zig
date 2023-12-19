@@ -38,7 +38,7 @@ pub const Board = struct {
     halfmove_clock: u8,
     fullmove_number: u16,
 
-    fn getCastlingRights(self: *Board) CastlingRights {
+    pub fn getCastlingRights(self: *Board) CastlingRights {
         return CastlingRights{
             .K = self.castling_rights & masks.castling_K,
             .Q = self.castling_rights & masks.castling_Q,
@@ -47,7 +47,7 @@ pub const Board = struct {
         };
     }
 
-    fn setCastlingRights(self: *Board, rights: CastlingRights) void {
+    pub fn setCastlingRights(self: *Board, rights: CastlingRights) void {
         self.castling_rights = 0;
         if (rights.K) self.castling_rights |= masks.castling_K;
         if (rights.Q) self.castling_rights |= masks.castling_Q;
