@@ -1,5 +1,5 @@
 const std = @import("std");
-const debugger = @import("perft.zig");
+const perft = @import("perft.zig");
 
 pub fn main() !void {
     var args = std.process.args();
@@ -10,9 +10,9 @@ pub fn main() !void {
     const info = args.next() orelse "noinfo";
 
     if (cmp(info, "info")) {
-        try debugger.perftInfo(fen, depth);
+        try perft.perftInfo(fen, depth);
     } else if (cmp(info, "noinfo")) {
-        try debugger.perft(fen, depth);
+        try perft.perft(fen, depth);
     } else {
         unreachable;
     }
