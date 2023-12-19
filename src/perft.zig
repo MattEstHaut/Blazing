@@ -11,8 +11,16 @@ fn getMNodesPerSec(nodes: u64, dt: i128) f64 {
 pub fn perft(fen: [*:0]const u8, depth: u64) !void {
     const board = try io.parse(fen);
 
+    const allocator = std.heap.page_allocator;
+    var nodes_list = std.ArrayList(chess.Board).init(allocator);
+    defer nodes_list.deinit();
+
+    _ = movegen.explore(board, depth, false, &nodes_list);
+
+    std.debug.print("{d} nodes found\n", .{nodes_list.items.len});
+
     const t0 = std.time.nanoTimestamp();
-    const nodes = movegen.explore(board, depth, true);
+    const nodes = movegen.explore(board, depth, true, null);
     const dt = std.time.nanoTimestamp() - t0;
 
     const mnodes_per_s = getMNodesPerSec(nodes, dt);
