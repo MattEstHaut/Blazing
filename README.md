@@ -4,11 +4,15 @@ Générateur de coups légaux pour le jeu d'échecs.
 
 ## Compilation
 
-`zig build -Doptimize=ReleaseFast`
+```bash
+zig build -Doptimize=ReleaseFast
+```
 
 ## Utilisation
 
-`./zig-out/bin/Blazing <fen> <profondeur> [info|noinfo]`
+```bash
+./zig-out/bin/Blazing <fen> <profondeur> [info|noinfo]
+```
 
 - `fen` : position initiale au format FEN
 - `profondeur` : profondeur de recherche en nombre de coups
