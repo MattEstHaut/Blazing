@@ -16,7 +16,7 @@ pub fn perftInfo(fen: [*:0]const u8, depth: u64) !void {
 }
 
 fn perftInfoDetails(board: chess.Board, depth: u64, comptime color: chess.Color, _: anytype, arg: anytype) u64 {
-    const nodes = movegen.explore(board, depth, color, movegen.explore, arg);
+    const nodes = movegen.exploreThread(board, depth, color, null, null);
     const old = if (arg.side_to_move == chess.Color.white) arg.white else arg.black;
     const new = if (arg.side_to_move == chess.Color.white) board.white else board.black;
     const diff = new.occupied() ^ old.occupied();
