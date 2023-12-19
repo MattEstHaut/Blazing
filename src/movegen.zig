@@ -130,8 +130,8 @@ inline fn bishopLookup(bishop: chess.Bitboard, occupied: chess.Bitboard) chess.B
 inline fn rookLookup(rook: chess.Bitboard, occupied: chess.Bitboard) chess.Bitboard {
     const rook_index = @ctz(rook);
 
-    const col_mask = masks.first_col << @intCast(rook_index & 7);
-    const row_mask = masks.first_row << @intCast(rook_index & 56);
+    const col_mask = col_masks[rook_index];
+    const row_mask = row_masks[rook_index];
 
     const col_lookup = hyperbolaQuintessence(rook, occupied, col_mask);
     const row_lookup = hyperbolaQuintessence(rook, occupied, row_mask);
@@ -232,8 +232,8 @@ inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, comp
 
     const king_index = @ctz(king);
 
-    const col_mask = masks.first_col << @intCast(king_index & 7);
-    const row_mask = masks.first_row << @intCast(king_index & 56);
+    const col_mask = col_masks[king_index];
+    const row_mask = row_masks[king_index];
     const ascending_mask = ascending_masks[king_index];
     const descending_mask = descending_masks[king_index];
 
