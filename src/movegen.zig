@@ -650,12 +650,9 @@ fn countMoves(board: chess.Board, comptime color: chess.Color) u64 {
     return nodes;
 }
 
-const ExplorerCallback = *fn (board: chess.Board, depth: u64, callbacks: *void, arg: *void) u64;
-pub const ExplorerCallbacks = std.BoundedArray(ExplorerCallback, 20);
-
-pub fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color) u64 {
+pub fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, comptime perft: bool) u64 {
     if (depth == 0) return 1;
-    if (depth == 1) return countMoves(board, color);
+    if (perft and depth == 1) return countMoves(board, color);
     var nodes: u64 = 0;
 
     const positions = if (color == chess.Color.white) board.white else board.black;
@@ -891,9 +888,9 @@ pub fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Col
     return nodes;
 }
 
-pub fn explore(board: chess.Board, depth: u64) u64 {
+pub fn explore(board: chess.Board, depth: u64, comptime perft: bool) u64 {
     switch (board.side_to_move) {
-        .white => return exploreCallback(board, depth, .white),
-        .black => return exploreCallback(board, depth, .black),
+        .white => return exploreCallback(board, depth, .white, perft),
+        .black => return exploreCallback(board, depth, .black, perft),
     }
 }

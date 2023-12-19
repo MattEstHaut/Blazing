@@ -12,7 +12,7 @@ pub fn perft(fen: [*:0]const u8, depth: u64) !void {
     const board = try io.parse(fen);
 
     const t0 = std.time.nanoTimestamp();
-    const nodes = movegen.explore(board, depth);
+    const nodes = movegen.explore(board, depth, true);
     const dt = std.time.nanoTimestamp() - t0;
 
     const mnodes_per_s = getMNodesPerSec(nodes, dt);
