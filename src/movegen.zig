@@ -335,12 +335,18 @@ inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, comp
     return all_masks;
 }
 
-const Promotion = enum {
+pub const Promotion = enum {
     queen,
     rook,
     bishop,
     knight,
     none,
+};
+
+pub const Move = struct {
+    src: masks.Mask,
+    dest: masks.Mask,
+    promotion: Promotion,
 };
 
 inline fn reset(board: *chess.Board, where: masks.Mask, comptime color: chess.Color) void {
