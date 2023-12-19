@@ -8,30 +8,40 @@ fn getMNodesPerSec(nodes: u64, dt: i128) f64 {
     return mn_per_100_sec / 100;
 }
 
+fn count(board: chess.Board, depth: u64, result: *u64) void {
+    result.* = movegen.explore(board, depth, true, null);
+}
+
 pub fn perft(fen: [*:0]const u8, depth: u64) !void {
     const stdout = std.io.getStdOut().writer();
     const board = try io.parse(fen);
 
     const allocator = std.heap.page_allocator;
     var start_list = std.ArrayList(chess.Board).init(allocator);
+    var thread_list = std.ArrayList(std.Thread).init(allocator);
     var result_list = std.ArrayList(u64).init(allocator);
     defer start_list.deinit();
     defer result_list.deinit();
+    defer thread_list.deinit();
 
     _ = movegen.explore(board, 1, false, &start_list);
     try result_list.appendNTimes(0, start_list.items.len);
-    var total_nodes: u64 = 0;
 
     const t0 = std.time.nanoTimestamp();
     for (start_list.items, 0..) |start, id| {
-        const diff = io.diff(board, start);
-        const nodes = movegen.explore(start, depth - 1, true, null);
-        try stdout.print("{s}: {d}\n", .{ io.moveToString(diff), nodes });
-        result_list.items[id] = nodes;
-        total_nodes += nodes;
+        const thread = try std.Thread.spawn(.{}, count, .{ start, depth - 1, &result_list.items[id] });
+        try thread_list.append(thread);
+    }
+
+    var nodes: u64 = 0;
+    for (thread_list.items, 0..) |thread, id| {
+        thread.join();
+        const diff = io.diff(board, start_list.items[id]);
+        nodes += result_list.items[id];
+        try stdout.print("{s}: {d}\n", .{ io.moveToString(diff), result_list.items[id] });
     }
     const dt = std.time.nanoTimestamp() - t0;
 
-    const mnodes_per_s = getMNodesPerSec(total_nodes, dt);
-    std.debug.print("{d} nodes found in {d}ms ({d:.3} MNodes/s)\n", .{ total_nodes, @divTrunc(dt, 1000000), mnodes_per_s });
+    const mnodes_per_s = getMNodesPerSec(nodes, dt);
+    std.debug.print("{d} nodes found in {d}ms ({d:.3} MNodes/s)\n", .{ nodes, @divTrunc(dt, 1000000), mnodes_per_s });
 }
