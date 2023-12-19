@@ -16,6 +16,11 @@ pub fn perft(fen: [*:0]const u8, depth: u64) !void {
     const stdout = std.io.getStdOut().writer();
     const board = try io.parse(fen);
 
+    if (depth == 0) {
+        try stdout.print("{d} node found\n", .{1});
+        return;
+    }
+
     const allocator = std.heap.page_allocator;
     var start_list = std.ArrayList(chess.Board).init(allocator);
     var thread_list = std.ArrayList(std.Thread).init(allocator);
@@ -25,6 +30,16 @@ pub fn perft(fen: [*:0]const u8, depth: u64) !void {
     defer thread_list.deinit();
 
     _ = movegen.explore(board, 1, false, &start_list);
+
+    if (depth == 1) {
+        for (start_list.items) |result| {
+            const diff = io.diff(board, result);
+            try stdout.print("{s}\n", .{io.moveToString(diff)});
+        }
+        try stdout.print("{d} nodes found\n", .{start_list.items.len});
+        return;
+    }
+
     try result_list.appendNTimes(0, start_list.items.len);
 
     const t0 = std.time.nanoTimestamp();
