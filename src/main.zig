@@ -1,5 +1,5 @@
 const std = @import("std");
-const debugger = @import("debugger.zig");
+const debugger = @import("perft.zig");
 
 pub fn main() !void {
     var args = std.process.args();
