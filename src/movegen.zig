@@ -335,12 +335,18 @@ inline fn createPinCheckMasks(board: chess.Board, occupied: chess.Bitboard, comp
     return all_masks;
 }
 
-const Promotion = enum {
+pub const Promotion = enum {
     queen,
     rook,
     bishop,
     knight,
     none,
+};
+
+pub const Move = struct {
+    from: masks.Mask,
+    to: masks.Mask,
+    promotion: Promotion,
 };
 
 inline fn reset(board: *chess.Board, where: masks.Mask, comptime color: chess.Color) void {
@@ -450,8 +456,212 @@ inline fn swapSides(board: *chess.Board, comptime color: chess.Color) void {
     board.halfmove_clock += 1;
 }
 
-pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, callback: anytype, arg: anytype) u64 {
-    if (depth == 0) return 1;
+inline fn castlingRightK(board: chess.Board, occupied: chess.Bitboard, comptime color: chess.Color) bool {
+    if (board.castling_rights & masks.castling_K == masks.castling_K) {
+        if (occupied & (masks.one << 61 | masks.one << 62) == 0) {
+            if (!isAttackedBy(board, masks.one << 60, occupied, reverseColor(color))) {
+                if (!isAttackedBy(board, masks.one << 61, occupied, reverseColor(color))) {
+                    if (!isAttackedBy(board, masks.one << 62, occupied, reverseColor(color))) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+inline fn castlingRightQ(board: chess.Board, occupied: chess.Bitboard, comptime color: chess.Color) bool {
+    if (board.castling_rights & masks.castling_Q == masks.castling_Q) {
+        if (occupied & (masks.one << 59 | masks.one << 58 | masks.one << 57) == 0) {
+            if (!isAttackedBy(board, masks.one << 60, occupied, reverseColor(color))) {
+                if (!isAttackedBy(board, masks.one << 59, occupied, reverseColor(color))) {
+                    if (!isAttackedBy(board, masks.one << 58, occupied, reverseColor(color))) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+inline fn castlingRightBlackK(board: chess.Board, occupied: chess.Bitboard, comptime color: chess.Color) bool {
+    if (board.castling_rights & masks.castling_k == masks.castling_k) {
+        if (occupied & (masks.one << 5 | masks.one << 6) == 0) {
+            if (!isAttackedBy(board, masks.one << 4, occupied, reverseColor(color))) {
+                if (!isAttackedBy(board, masks.one << 5, occupied, reverseColor(color))) {
+                    if (!isAttackedBy(board, masks.one << 6, occupied, reverseColor(color))) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+inline fn castlingRightBlackQ(board: chess.Board, occupied: chess.Bitboard, comptime color: chess.Color) bool {
+    if (board.castling_rights & masks.castling_q == masks.castling_q) {
+        if (occupied & (masks.one << 3 | masks.one << 2 | masks.one << 1) == 0) {
+            if (!isAttackedBy(board, masks.one << 2, occupied, reverseColor(color))) {
+                if (!isAttackedBy(board, masks.one << 3, occupied, reverseColor(color))) {
+                    if (!isAttackedBy(board, masks.one << 4, occupied, reverseColor(color))) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+fn countMoves(board: chess.Board, comptime color: chess.Color) u64 {
+    var nodes: u64 = 0;
+
+    const positions = if (color == chess.Color.white) board.white else board.black;
+    const enemy = if (color == chess.Color.white) board.black.occupied() else board.white.occupied();
+    const occupied = positions.occupied() | enemy;
+    const empty_or_enemy = ~occupied | enemy;
+
+    const pin_and_check = createPinCheckMasks(board, occupied, color);
+    const en_passant_check = (pawnsForward(pin_and_check.check, 0, color) & board.en_passant) | pin_and_check.check;
+
+    {
+        const lookup = kingLookup(positions.king) & empty_or_enemy;
+        var dest_iter = masks.nextbit(lookup);
+        while (dest_iter.nextMask()) |dest| {
+            if (!isAttackedBy(board, dest, occupied, reverseColor(color))) nodes += 1;
+        }
+    }
+
+    if (pin_and_check.checks > 1) return nodes;
+
+    const pin_hv = pin_and_check.pin_hor | pin_and_check.pin_ver;
+    const pin_ad = pin_and_check.pin_asc | pin_and_check.pin_desc;
+
+    {
+        var src_iter = masks.nextbit(positions.knights & ~(pin_hv | pin_ad));
+        while (src_iter.nextMask()) |src| {
+            const lookup = knightLookup(src) & empty_or_enemy & pin_and_check.check;
+            nodes += @popCount(lookup);
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.bishops & ~pin_hv);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_asc & src != 0) {
+                pin_mask = pin_and_check.pin_asc;
+            } else if (pin_and_check.pin_desc & src != 0) {
+                pin_mask = pin_and_check.pin_desc;
+            }
+
+            const lookup = bishopLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
+            nodes += @popCount(lookup);
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.rooks & ~pin_ad);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_hor & src != 0) {
+                pin_mask = pin_and_check.pin_hor;
+            } else if (pin_and_check.pin_ver & src != 0) {
+                pin_mask = pin_and_check.pin_ver;
+            }
+
+            const lookup = rookLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
+            nodes += @popCount(lookup);
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.queens);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_hor & src != 0) {
+                pin_mask = pin_and_check.pin_hor;
+            } else if (pin_and_check.pin_ver & src != 0) {
+                pin_mask = pin_and_check.pin_ver;
+            } else if (pin_and_check.pin_asc & src != 0) {
+                pin_mask = pin_and_check.pin_asc;
+            } else if (pin_and_check.pin_desc & src != 0) {
+                pin_mask = pin_and_check.pin_desc;
+            }
+
+            const lookup = queenLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
+            nodes += @popCount(lookup);
+        }
+    }
+
+    {
+        const prom_row = if (color == chess.Color.white) masks.first_row else masks.last_row;
+
+        const src = positions.pawns & ~(pin_ad | pin_and_check.pin_hor);
+        const lookup = pawnsForward(src, occupied, color) & pin_and_check.check;
+        nodes += @popCount(lookup);
+        nodes += @popCount(lookup & prom_row) * 3;
+    }
+
+    {
+        const src = positions.pawns & ~(pin_ad | pin_and_check.pin_hor);
+        const lookup = pawnsDoubleForward(src, occupied, color) & pin_and_check.check;
+        nodes += @popCount(lookup);
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.pawns & ~pin_hv);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_asc & src != 0) {
+                pin_mask = pin_and_check.pin_asc;
+            } else if (pin_and_check.pin_desc & src != 0) {
+                pin_mask = pin_and_check.pin_desc;
+            }
+
+            const dest = pawnCaptures(src, color) & pin_and_check.check & pin_mask & enemy;
+            if (dest & (masks.first_row | masks.last_row) != 0) {
+                nodes += @popCount(dest) * 4;
+            } else {
+                nodes += @popCount(dest);
+            }
+        }
+    }
+
+    {
+        const lookup = pawnCaptures(board.en_passant & en_passant_check, reverseColor(color));
+        var src_iter = masks.nextbit(positions.pawns & ~pin_hv & lookup);
+        while (src_iter.nextMask()) |src| {
+            var child = board;
+            doEnPassant(&child, src, color);
+            swapSides(&child, color);
+            const child_occupied = child.white.occupied() | child.black.occupied();
+            if (!isAttackedBy(child, positions.king, child_occupied, reverseColor(color))) nodes += 1;
+        }
+    }
+
+    {
+        if (color == chess.Color.white) {
+            if (castlingRightK(board, occupied, color)) nodes += 1;
+            if (castlingRightQ(board, occupied, color)) nodes += 1;
+        } else {
+            if (castlingRightBlackK(board, occupied, color)) nodes += 1;
+            if (castlingRightBlackQ(board, occupied, color)) nodes += 1;
+        }
+    }
+
+    return nodes;
+}
+
+pub fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, comptime perft: bool, nodes_list: ?*std.ArrayList(chess.Board)) u64 {
+    if (depth == 0) {
+        if (nodes_list != null) nodes_list.?.append(board) catch unreachable;
+        return 1;
+    }
+    if (perft and depth == 1) return countMoves(board, color);
     var nodes: u64 = 0;
 
     const positions = if (color == chess.Color.white) board.white else board.black;
@@ -470,7 +680,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
             var child = board;
             doKingMove(&child, dest, color);
             swapSides(&child, color);
-            nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+            nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
         }
     }
 
@@ -488,7 +698,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 var child = board;
                 doKnightMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
             }
         }
     }
@@ -509,7 +719,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 var child = board;
                 doBishopMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
             }
         }
     }
@@ -530,7 +740,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 var child = board;
                 doRookMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
             }
         }
     }
@@ -555,7 +765,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 var child = board;
                 doQueenMove(&child, src, dest, color);
                 swapSides(&child, color);
-                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
             }
         }
     }
@@ -573,18 +783,18 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
             if (dest & prom_row != 0) {
                 var child_queen = child;
                 doPromotion(&child_queen, dest, Promotion.queen, color);
-                nodes += callback(child_queen, depth - 1, reverseColor(color), callback, arg);
+                nodes += exploreCallback(child_queen, depth - 1, reverseColor(color), perft, nodes_list);
                 var child_rook = child;
                 doPromotion(&child_rook, dest, Promotion.rook, color);
-                nodes += callback(child_rook, depth - 1, reverseColor(color), callback, arg);
+                nodes += exploreCallback(child_rook, depth - 1, reverseColor(color), perft, nodes_list);
                 var child_bishop = child;
                 doPromotion(&child_bishop, dest, Promotion.bishop, color);
-                nodes += callback(child_bishop, depth - 1, reverseColor(color), callback, arg);
+                nodes += exploreCallback(child_bishop, depth - 1, reverseColor(color), perft, nodes_list);
                 var child_knight = child;
                 doPromotion(&child_knight, dest, Promotion.knight, color);
-                nodes += callback(child_knight, depth - 1, reverseColor(color), callback, arg);
+                nodes += exploreCallback(child_knight, depth - 1, reverseColor(color), perft, nodes_list);
             } else {
-                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
             }
         }
     }
@@ -597,7 +807,7 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
             var child = board;
             doPawnDoubleForward(&child, dest, color);
             swapSides(&child, color);
-            nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+            nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
         }
     }
 
@@ -620,18 +830,18 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
                 if (dest & (masks.first_row | masks.last_row) != 0) {
                     var child_queen = child;
                     doPromotion(&child_queen, dest, Promotion.queen, color);
-                    nodes += callback(child_queen, depth - 1, reverseColor(color), callback, arg);
+                    nodes += exploreCallback(child_queen, depth - 1, reverseColor(color), perft, nodes_list);
                     var child_rook = child;
                     doPromotion(&child_rook, dest, Promotion.rook, color);
-                    nodes += callback(child_rook, depth - 1, reverseColor(color), callback, arg);
+                    nodes += exploreCallback(child_rook, depth - 1, reverseColor(color), perft, nodes_list);
                     var child_bishop = child;
                     doPromotion(&child_bishop, dest, Promotion.bishop, color);
-                    nodes += callback(child_bishop, depth - 1, reverseColor(color), callback, arg);
+                    nodes += exploreCallback(child_bishop, depth - 1, reverseColor(color), perft, nodes_list);
                     var child_knight = child;
                     doPromotion(&child_knight, dest, Promotion.knight, color);
-                    nodes += callback(child_knight, depth - 1, reverseColor(color), callback, arg);
+                    nodes += exploreCallback(child_knight, depth - 1, reverseColor(color), perft, nodes_list);
                 } else {
-                    nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+                    nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
                 }
             }
         }
@@ -641,84 +851,45 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
         const lookup = pawnCaptures(board.en_passant & en_passant_check, reverseColor(color));
         var src_iter = masks.nextbit(positions.pawns & ~pin_hv & lookup);
         while (src_iter.nextMask()) |src| {
-            var pin_mask: masks.Mask = masks.full;
-            if (pin_and_check.pin_asc & src != 0) {
-                pin_mask = pin_and_check.pin_asc;
-            } else if (pin_and_check.pin_desc & src != 0) {
-                pin_mask = pin_and_check.pin_desc;
-            }
-
             var child = board;
             doEnPassant(&child, src, color);
             swapSides(&child, color);
             const child_occupied = child.white.occupied() | child.black.occupied();
             if (isAttackedBy(child, positions.king, child_occupied, reverseColor(color))) continue;
-            nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
+            nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
         }
     }
 
     {
         if (color == chess.Color.white) {
-            if (board.castling_rights & masks.castling_K == masks.castling_K) {
-                if (occupied & (masks.one << 61 | masks.one << 62) == 0) {
-                    if (!isAttackedBy(board, masks.one << 60, occupied, reverseColor(color))) {
-                        if (!isAttackedBy(board, masks.one << 61, occupied, reverseColor(color))) {
-                            if (!isAttackedBy(board, masks.one << 62, occupied, reverseColor(color))) {
-                                var child = board;
-                                doKingMove(&child, masks.one << 62, color);
-                                doRookMove(&child, masks.one << 63, masks.one << 61, color);
-                                swapSides(&child, color);
-                                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
-                            }
-                        }
-                    }
-                }
+            if (castlingRightK(board, occupied, color)) {
+                var child = board;
+                doKingMove(&child, masks.one << 62, color);
+                doRookMove(&child, masks.one << 63, masks.one << 61, color);
+                swapSides(&child, color);
+                nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
             }
-            if (board.castling_rights & masks.castling_Q == masks.castling_Q) {
-                if (occupied & (masks.one << 59 | masks.one << 58 | masks.one << 57) == 0) {
-                    if (!isAttackedBy(board, masks.one << 60, occupied, reverseColor(color))) {
-                        if (!isAttackedBy(board, masks.one << 59, occupied, reverseColor(color))) {
-                            if (!isAttackedBy(board, masks.one << 58, occupied, reverseColor(color))) {
-                                var child = board;
-                                doKingMove(&child, masks.one << 58, color);
-                                doRookMove(&child, masks.one << 56, masks.one << 59, color);
-                                swapSides(&child, color);
-                                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
-                            }
-                        }
-                    }
-                }
+            if (castlingRightQ(board, occupied, color)) {
+                var child = board;
+                doKingMove(&child, masks.one << 58, color);
+                doRookMove(&child, masks.one << 56, masks.one << 59, color);
+                swapSides(&child, color);
+                nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
             }
         } else {
-            if (board.castling_rights & masks.castling_k == masks.castling_k) {
-                if (occupied & (masks.one << 5 | masks.one << 6) == 0) {
-                    if (!isAttackedBy(board, masks.one << 4, occupied, reverseColor(color))) {
-                        if (!isAttackedBy(board, masks.one << 5, occupied, reverseColor(color))) {
-                            if (!isAttackedBy(board, masks.one << 6, occupied, reverseColor(color))) {
-                                var child = board;
-                                doKingMove(&child, masks.one << 6, color);
-                                doRookMove(&child, masks.one << 7, masks.one << 5, color);
-                                swapSides(&child, color);
-                                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
-                            }
-                        }
-                    }
-                }
+            if (castlingRightBlackK(board, occupied, color)) {
+                var child = board;
+                doKingMove(&child, masks.one << 6, color);
+                doRookMove(&child, masks.one << 7, masks.one << 5, color);
+                swapSides(&child, color);
+                nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
             }
-            if (board.castling_rights & masks.castling_q == masks.castling_q) {
-                if (occupied & (masks.one << 3 | masks.one << 2 | masks.one << 1) == 0) {
-                    if (!isAttackedBy(board, masks.one << 2, occupied, reverseColor(color))) {
-                        if (!isAttackedBy(board, masks.one << 3, occupied, reverseColor(color))) {
-                            if (!isAttackedBy(board, masks.one << 4, occupied, reverseColor(color))) {
-                                var child = board;
-                                doKingMove(&child, masks.one << 2, color);
-                                doRookMove(&child, masks.one << 0, masks.one << 3, color);
-                                swapSides(&child, color);
-                                nodes += callback(child, depth - 1, reverseColor(color), callback, arg);
-                            }
-                        }
-                    }
-                }
+            if (castlingRightBlackQ(board, occupied, color)) {
+                var child = board;
+                doKingMove(&child, masks.one << 2, color);
+                doRookMove(&child, masks.one << 0, masks.one << 3, color);
+                swapSides(&child, color);
+                nodes += exploreCallback(child, depth - 1, reverseColor(color), perft, nodes_list);
             }
         }
     }
@@ -726,47 +897,9 @@ pub fn explore(board: chess.Board, depth: u64, comptime color: chess.Color, call
     return nodes;
 }
 
-pub fn exploreEntry(explorer: anytype, board: chess.Board, depth: u64, callback: anytype, arg: anytype) u64 {
+pub fn explore(board: chess.Board, depth: u64, comptime perft: bool, nodes_list: ?*std.ArrayList(chess.Board)) u64 {
     switch (board.side_to_move) {
-        .white => return explorer(board, depth, .white, callback, arg),
-        .black => return explorer(board, depth, .black, callback, arg),
+        .white => return exploreCallback(board, depth, .white, perft, nodes_list),
+        .black => return exploreCallback(board, depth, .black, perft, nodes_list),
     }
-}
-
-const max_threads = 200;
-
-const ExploreThreadArg = struct {
-    id: usize = 0,
-    threads: [max_threads]std.Thread,
-    nodes: [max_threads]u64,
-};
-
-const ExploreThreadResultArg = struct {
-    arg: *ExploreThreadArg,
-    id: usize,
-};
-
-pub fn exploreThread(board: chess.Board, depth: u64, comptime color: chess.Color, _: anytype, _: anytype) u64 {
-    const moves = explore(board, 1, color, explore, null);
-    var arg = ExploreThreadArg{ .id = 0, .threads = undefined, .nodes = undefined };
-
-    _ = explore(board, depth, color, exploreNewThread, &arg);
-
-    var nodes: u64 = 0;
-    for (0..moves) |i| {
-        arg.threads[i].join();
-        nodes += arg.nodes[i];
-    }
-
-    return nodes;
-}
-
-inline fn exploreNewThread(board: chess.Board, depth: u64, comptime color: chess.Color, _: anytype, arg: *ExploreThreadArg) u64 {
-    arg.threads[arg.id] = std.Thread.spawn(.{}, exploreThreadResult, .{ board, depth, color, .{ .arg = arg, .id = arg.id } }) catch unreachable;
-    arg.id += 1;
-    return 0;
-}
-
-inline fn exploreThreadResult(board: chess.Board, depth: u64, comptime color: chess.Color, arg: ExploreThreadResultArg) void {
-    arg.arg.nodes[arg.id] = explore(board, depth, color, explore, null);
 }

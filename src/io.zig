@@ -1,5 +1,6 @@
 const chess = @import("chess.zig");
 const masks = @import("masks.zig");
+const movegen = @import("movegen.zig");
 
 const BoardString = struct {
     string: [71]u8,
@@ -181,4 +182,55 @@ pub fn maskToSquare(mask: masks.Mask) [2]u8 {
     const col = index & 7;
     const row = index / 8;
     return [2]u8{ 'a' + col, '8' - row };
+}
+
+pub fn diff(from: chess.Board, to: chess.Board) movegen.Move {
+    const from_pieces = if (from.side_to_move == chess.Color.white) from.white else from.black;
+    const to_pieces = if (from.side_to_move == chess.Color.white) to.white else to.black;
+    const occ_diff = from_pieces.occupied() ^ to_pieces.occupied();
+
+    if (from_pieces.king & occ_diff > 0) {
+        return movegen.Move{ .from = from_pieces.king, .to = to_pieces.king, .promotion = movegen.Promotion.none };
+    }
+
+    const prom_row = if (from.side_to_move == chess.Color.white) masks.first_row << 8 else masks.last_row >> 8;
+    const from_promotion = occ_diff & from_pieces.pawns & prom_row;
+    if (from_promotion > 0) {
+        const to_promotion = if (from.side_to_move == chess.Color.white) from_promotion >> 8 else from_promotion << 8;
+        var promotion = movegen.Promotion.none;
+
+        if (to_promotion & to_pieces.queens > 0) promotion = movegen.Promotion.queen;
+        if (to_promotion & to_pieces.rooks > 0) promotion = movegen.Promotion.rook;
+        if (to_promotion & to_pieces.bishops > 0) promotion = movegen.Promotion.bishop;
+        if (to_promotion & to_pieces.knights > 0) promotion = movegen.Promotion.knight;
+
+        return movegen.Move{ .from = from_promotion, .to = to_promotion, .promotion = promotion };
+    }
+
+    const from_mask = from_pieces.occupied() & occ_diff;
+    const to_mask = to_pieces.occupied() & occ_diff;
+
+    return movegen.Move{ .from = from_mask, .to = to_mask, .promotion = movegen.Promotion.none };
+}
+
+pub fn moveToString(move: movegen.Move) [5]u8 {
+    var result: [5]u8 = undefined;
+    const from = maskToSquare(move.from);
+    const to = maskToSquare(move.to);
+    result[0] = from[0];
+    result[1] = from[1];
+    result[2] = to[0];
+    result[3] = to[1];
+    if (move.promotion != movegen.Promotion.none) {
+        switch (move.promotion) {
+            movegen.Promotion.queen => result[4] = 'q',
+            movegen.Promotion.rook => result[4] = 'r',
+            movegen.Promotion.bishop => result[4] = 'b',
+            movegen.Promotion.knight => result[4] = 'n',
+            else => unreachable,
+        }
+    } else {
+        result[4] = 0;
+    }
+    return result;
 }
