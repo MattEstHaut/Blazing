@@ -2,7 +2,9 @@ const std = @import("std");
 const perft = @import("perft.zig");
 
 pub fn main() !void {
-    var args = std.process.args();
+    const allocator = std.heap.page_allocator;
+    var args = try std.process.argsWithAllocator(allocator);
+    defer args.deinit();
 
     _ = args.skip();
     const fen = args.next() orelse unreachable;
