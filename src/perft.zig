@@ -60,3 +60,22 @@ pub fn perft(fen: [*:0]const u8, depth: u64) !void {
     const mnodes_per_s = getMNodesPerSec(nodes, dt);
     std.debug.print("{d} nodes found in {d}ms ({d:.3} MNodes/s)\n", .{ nodes, @divTrunc(dt, 1000000), mnodes_per_s });
 }
+
+pub fn benchmark(fen: [*:0]const u8, depth: u64, n: u64) !void {
+    const stdout = std.io.getStdOut().writer();
+    const board = try io.parse(fen);
+
+    var nodes: u64 = 0;
+
+    const t0 = std.time.nanoTimestamp();
+    for (0..n) |_| {
+        nodes = movegen.explore(board, depth, true, null);
+    }
+    const dt = std.time.nanoTimestamp() - t0;
+
+    const dt_mean = @divTrunc(dt, n);
+    const mnodes_per_s = getMNodesPerSec(nodes, dt_mean);
+    const dt_ms = @divTrunc(dt_mean, 1000000);
+
+    try stdout.print("{s} at depth={d} : mean={d}ms ({d:.3}MNodes/sec) (n={d})\n", .{ fen, depth, dt_ms, mnodes_per_s, n });
+}
