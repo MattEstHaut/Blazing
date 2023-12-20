@@ -12,15 +12,11 @@ const descending_masks = descendingMasks();
 inline fn kingLookup(king: chess.Bitboard) chess.Bitboard {
     const no_left = king & masks.no_left;
     const no_right = king & masks.no_right;
-    var lookup = king >> 8;
-    lookup |= no_left >> 9;
+    var lookup = king;
     lookup |= no_left >> 1;
-    lookup |= no_left << 7;
-    lookup |= king << 8;
-    lookup |= no_right << 9;
     lookup |= no_right << 1;
-    lookup |= no_right >> 7;
-    return lookup;
+    lookup |= lookup << 8 | lookup >> 8;
+    return lookup - king;
 }
 
 inline fn knightLookup(knight: chess.Bitboard) chess.Bitboard {
