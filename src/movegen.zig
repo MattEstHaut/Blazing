@@ -652,10 +652,10 @@ fn countMoves(board: chess.Board, comptime color: chess.Color) u64 {
     return nodes;
 }
 
-pub fn explore(board: chess.Board, depth: u64, comptime callback: Callback, arg: anytype) void {
+pub fn explore(board: chess.Board, depth: u64, comptime start: Callback, comptime end: Callback, arg: anytype) void {
     switch (board.side_to_move) {
-        .white => exploreCallback(board, depth, .white, callback, arg),
-        .black => exploreCallback(board, depth, .black, callback, arg),
+        .white => exploreCallback(board, depth, .white, start, end, arg),
+        .black => exploreCallback(board, depth, .black, start, end, arg),
     }
 }
 
@@ -666,8 +666,12 @@ pub const CallbackReturn = enum {
 
 const Callback = fn (board: chess.Board, depth: u64, comptime color: chess.Color, arg: anytype) callconv(.Inline) CallbackReturn;
 
-fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, comptime callback: Callback, arg: anytype) void {
-    if (callback(board, depth, color, arg) == CallbackReturn.abort) return;
+pub inline fn doNothing(_: chess.Board, _: u64, comptime _: chess.Color, _: anytype) CallbackReturn {
+    return .next;
+}
+
+fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, comptime start: Callback, comptime end: Callback, arg: anytype) void {
+    if (start(board, depth, color, arg) == CallbackReturn.abort) return;
     if (depth == 0) return;
 
     const positions = if (color == chess.Color.white) board.white else board.black;
@@ -686,7 +690,7 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
             var child = board;
             doKingMove(&child, dest, color);
             swapSides(&child, color);
-            exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+            exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
         }
     }
 
@@ -704,7 +708,7 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
                 var child = board;
                 doKnightMove(&child, src, dest, color);
                 swapSides(&child, color);
-                exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
             }
         }
     }
@@ -725,7 +729,7 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
                 var child = board;
                 doBishopMove(&child, src, dest, color);
                 swapSides(&child, color);
-                exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
             }
         }
     }
@@ -746,7 +750,7 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
                 var child = board;
                 doRookMove(&child, src, dest, color);
                 swapSides(&child, color);
-                exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
             }
         }
     }
@@ -771,7 +775,7 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
                 var child = board;
                 doQueenMove(&child, src, dest, color);
                 swapSides(&child, color);
-                exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
             }
         }
     }
@@ -789,18 +793,18 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
             if (dest & prom_row != 0) {
                 var child_queen = child;
                 doPromotion(&child_queen, dest, Promotion.queen, color);
-                exploreCallback(child_queen, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child_queen, depth - 1, reverseColor(color), start, end, arg);
                 var child_rook = child;
                 doPromotion(&child_rook, dest, Promotion.rook, color);
-                exploreCallback(child_rook, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child_rook, depth - 1, reverseColor(color), start, end, arg);
                 var child_bishop = child;
                 doPromotion(&child_bishop, dest, Promotion.bishop, color);
-                exploreCallback(child_bishop, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child_bishop, depth - 1, reverseColor(color), start, end, arg);
                 var child_knight = child;
                 doPromotion(&child_knight, dest, Promotion.knight, color);
-                exploreCallback(child_knight, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child_knight, depth - 1, reverseColor(color), start, end, arg);
             } else {
-                exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
             }
         }
     }
@@ -813,7 +817,7 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
             var child = board;
             doPawnDoubleForward(&child, dest, color);
             swapSides(&child, color);
-            exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+            exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
         }
     }
 
@@ -836,18 +840,18 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
                 if (dest & (masks.first_row | masks.last_row) != 0) {
                     var child_queen = child;
                     doPromotion(&child_queen, dest, Promotion.queen, color);
-                    exploreCallback(child_queen, depth - 1, reverseColor(color), callback, arg);
+                    exploreCallback(child_queen, depth - 1, reverseColor(color), start, end, arg);
                     var child_rook = child;
                     doPromotion(&child_rook, dest, Promotion.rook, color);
-                    exploreCallback(child_rook, depth - 1, reverseColor(color), callback, arg);
+                    exploreCallback(child_rook, depth - 1, reverseColor(color), start, end, arg);
                     var child_bishop = child;
                     doPromotion(&child_bishop, dest, Promotion.bishop, color);
-                    exploreCallback(child_bishop, depth - 1, reverseColor(color), callback, arg);
+                    exploreCallback(child_bishop, depth - 1, reverseColor(color), start, end, arg);
                     var child_knight = child;
                     doPromotion(&child_knight, dest, Promotion.knight, color);
-                    exploreCallback(child_knight, depth - 1, reverseColor(color), callback, arg);
+                    exploreCallback(child_knight, depth - 1, reverseColor(color), start, end, arg);
                 } else {
-                    exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+                    exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
                 }
             }
         }
@@ -862,7 +866,7 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
             swapSides(&child, color);
             const child_occupied = child.white.occupied() | child.black.occupied();
             if (isAttackedBy(child, positions.king, child_occupied, reverseColor(color))) continue;
-            exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+            exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
         }
     }
 
@@ -873,14 +877,14 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
                 doKingMove(&child, masks.one << 62, color);
                 doRookMove(&child, masks.one << 63, masks.one << 61, color);
                 swapSides(&child, color);
-                exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
             }
             if (castlingRightQ(board, occupied, color)) {
                 var child = board;
                 doKingMove(&child, masks.one << 58, color);
                 doRookMove(&child, masks.one << 56, masks.one << 59, color);
                 swapSides(&child, color);
-                exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
             }
         } else {
             if (castlingRightBlackK(board, occupied, color)) {
@@ -888,17 +892,19 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
                 doKingMove(&child, masks.one << 6, color);
                 doRookMove(&child, masks.one << 7, masks.one << 5, color);
                 swapSides(&child, color);
-                exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
             }
             if (castlingRightBlackQ(board, occupied, color)) {
                 var child = board;
                 doKingMove(&child, masks.one << 2, color);
                 doRookMove(&child, masks.one << 0, masks.one << 3, color);
                 swapSides(&child, color);
-                exploreCallback(child, depth - 1, reverseColor(color), callback, arg);
+                exploreCallback(child, depth - 1, reverseColor(color), start, end, arg);
             }
         }
     }
+
+    _ = end(board, depth, color, arg);
 }
 
 const PerftCallbackArg = struct {
@@ -922,6 +928,6 @@ inline fn perftCallback(board: chess.Board, depth: u64, comptime color: chess.Co
 
 pub fn perft(board: chess.Board, depth: u64, comptime bulk: bool, nodes_list: ?*std.ArrayList(chess.Board)) u64 {
     var arg = PerftCallbackArg{ .nodes = 0, .bulk = bulk, .nodes_list = nodes_list };
-    explore(board, depth, perftCallback, &arg);
+    explore(board, depth, perftCallback, doNothing, &arg);
     return arg.nodes;
 }
