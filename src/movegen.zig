@@ -652,254 +652,6 @@ fn countMoves(board: chess.Board, comptime color: chess.Color) u64 {
     return nodes;
 }
 
-pub fn perftCallback(board: chess.Board, depth: u64, comptime color: chess.Color, comptime bulk: bool, nodes_list: ?*std.ArrayList(chess.Board)) u64 {
-    if (depth == 0) {
-        if (nodes_list != null) nodes_list.?.append(board) catch unreachable;
-        return 1;
-    }
-    if (bulk and depth == 1) return countMoves(board, color);
-    var nodes: u64 = 0;
-
-    const positions = if (color == chess.Color.white) board.white else board.black;
-    const enemy = if (color == chess.Color.white) board.black.occupied() else board.white.occupied();
-    const occupied = positions.occupied() | enemy;
-    const empty_or_enemy = ~occupied | enemy;
-
-    const pin_and_check = createPinCheckMasks(board, occupied, color);
-    const en_passant_check = (pawnsForward(pin_and_check.check, 0, color) & board.en_passant) | pin_and_check.check;
-
-    {
-        const lookup = kingLookup(positions.king) & empty_or_enemy;
-        var dest_iter = masks.nextbit(lookup);
-        while (dest_iter.nextMask()) |dest| {
-            if (isAttackedBy(board, dest, occupied, reverseColor(color))) continue;
-            var child = board;
-            doKingMove(&child, dest, color);
-            swapSides(&child, color);
-            nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-        }
-    }
-
-    if (pin_and_check.checks > 1) return nodes;
-
-    const pin_hv = pin_and_check.pin_hor | pin_and_check.pin_ver;
-    const pin_ad = pin_and_check.pin_asc | pin_and_check.pin_desc;
-
-    {
-        var src_iter = masks.nextbit(positions.knights & ~(pin_hv | pin_ad));
-        while (src_iter.nextMask()) |src| {
-            const lookup = knightLookup(src) & empty_or_enemy & pin_and_check.check;
-            var dest_iter = masks.nextbit(lookup);
-            while (dest_iter.nextMask()) |dest| {
-                var child = board;
-                doKnightMove(&child, src, dest, color);
-                swapSides(&child, color);
-                nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-            }
-        }
-    }
-
-    {
-        var src_iter = masks.nextbit(positions.bishops & ~pin_hv);
-        while (src_iter.nextMask()) |src| {
-            var pin_mask: masks.Mask = masks.full;
-            if (pin_and_check.pin_asc & src != 0) {
-                pin_mask = pin_and_check.pin_asc;
-            } else if (pin_and_check.pin_desc & src != 0) {
-                pin_mask = pin_and_check.pin_desc;
-            }
-
-            const lookup = bishopLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
-            var dest_iter = masks.nextbit(lookup);
-            while (dest_iter.nextMask()) |dest| {
-                var child = board;
-                doBishopMove(&child, src, dest, color);
-                swapSides(&child, color);
-                nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-            }
-        }
-    }
-
-    {
-        var src_iter = masks.nextbit(positions.rooks & ~pin_ad);
-        while (src_iter.nextMask()) |src| {
-            var pin_mask: masks.Mask = masks.full;
-            if (pin_and_check.pin_hor & src != 0) {
-                pin_mask = pin_and_check.pin_hor;
-            } else if (pin_and_check.pin_ver & src != 0) {
-                pin_mask = pin_and_check.pin_ver;
-            }
-
-            const lookup = rookLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
-            var dest_iter = masks.nextbit(lookup);
-            while (dest_iter.nextMask()) |dest| {
-                var child = board;
-                doRookMove(&child, src, dest, color);
-                swapSides(&child, color);
-                nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-            }
-        }
-    }
-
-    {
-        var src_iter = masks.nextbit(positions.queens);
-        while (src_iter.nextMask()) |src| {
-            var pin_mask: masks.Mask = masks.full;
-            if (pin_and_check.pin_hor & src != 0) {
-                pin_mask = pin_and_check.pin_hor;
-            } else if (pin_and_check.pin_ver & src != 0) {
-                pin_mask = pin_and_check.pin_ver;
-            } else if (pin_and_check.pin_asc & src != 0) {
-                pin_mask = pin_and_check.pin_asc;
-            } else if (pin_and_check.pin_desc & src != 0) {
-                pin_mask = pin_and_check.pin_desc;
-            }
-
-            const lookup = queenLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
-            var dest_iter = masks.nextbit(lookup);
-            while (dest_iter.nextMask()) |dest| {
-                var child = board;
-                doQueenMove(&child, src, dest, color);
-                swapSides(&child, color);
-                nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-            }
-        }
-    }
-
-    {
-        const prom_row = if (color == chess.Color.white) masks.first_row else masks.last_row;
-
-        var src_iter = masks.nextbit(positions.pawns & ~(pin_ad | pin_and_check.pin_hor));
-        while (src_iter.nextMask()) |src| {
-            const dest = pawnsForward(src, occupied, color) & pin_and_check.check;
-            if (dest == 0) continue;
-            var child = board;
-            doPawnForward(&child, dest, color);
-            swapSides(&child, color);
-            if (dest & prom_row != 0) {
-                var child_queen = child;
-                doPromotion(&child_queen, dest, Promotion.queen, color);
-                nodes += perftCallback(child_queen, depth - 1, reverseColor(color), bulk, nodes_list);
-                var child_rook = child;
-                doPromotion(&child_rook, dest, Promotion.rook, color);
-                nodes += perftCallback(child_rook, depth - 1, reverseColor(color), bulk, nodes_list);
-                var child_bishop = child;
-                doPromotion(&child_bishop, dest, Promotion.bishop, color);
-                nodes += perftCallback(child_bishop, depth - 1, reverseColor(color), bulk, nodes_list);
-                var child_knight = child;
-                doPromotion(&child_knight, dest, Promotion.knight, color);
-                nodes += perftCallback(child_knight, depth - 1, reverseColor(color), bulk, nodes_list);
-            } else {
-                nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-            }
-        }
-    }
-
-    {
-        var src_iter = masks.nextbit(positions.pawns & ~(pin_ad | pin_and_check.pin_hor));
-        while (src_iter.nextMask()) |src| {
-            const dest = pawnsDoubleForward(src, occupied, color) & pin_and_check.check;
-            if (dest == 0) continue;
-            var child = board;
-            doPawnDoubleForward(&child, dest, color);
-            swapSides(&child, color);
-            nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-        }
-    }
-
-    {
-        var src_iter = masks.nextbit(positions.pawns & ~pin_hv);
-        while (src_iter.nextMask()) |src| {
-            var pin_mask: masks.Mask = masks.full;
-            if (pin_and_check.pin_asc & src != 0) {
-                pin_mask = pin_and_check.pin_asc;
-            } else if (pin_and_check.pin_desc & src != 0) {
-                pin_mask = pin_and_check.pin_desc;
-            }
-
-            const lookup = pawnCaptures(src, color) & pin_and_check.check & pin_mask & enemy;
-            var dest_iter = masks.nextbit(lookup);
-            while (dest_iter.nextMask()) |dest| {
-                var child = board;
-                doPawnCapture(&child, src, dest, color);
-                swapSides(&child, color);
-                if (dest & (masks.first_row | masks.last_row) != 0) {
-                    var child_queen = child;
-                    doPromotion(&child_queen, dest, Promotion.queen, color);
-                    nodes += perftCallback(child_queen, depth - 1, reverseColor(color), bulk, nodes_list);
-                    var child_rook = child;
-                    doPromotion(&child_rook, dest, Promotion.rook, color);
-                    nodes += perftCallback(child_rook, depth - 1, reverseColor(color), bulk, nodes_list);
-                    var child_bishop = child;
-                    doPromotion(&child_bishop, dest, Promotion.bishop, color);
-                    nodes += perftCallback(child_bishop, depth - 1, reverseColor(color), bulk, nodes_list);
-                    var child_knight = child;
-                    doPromotion(&child_knight, dest, Promotion.knight, color);
-                    nodes += perftCallback(child_knight, depth - 1, reverseColor(color), bulk, nodes_list);
-                } else {
-                    nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-                }
-            }
-        }
-    }
-
-    {
-        const lookup = pawnCaptures(board.en_passant & en_passant_check, reverseColor(color));
-        var src_iter = masks.nextbit(positions.pawns & ~pin_hv & lookup);
-        while (src_iter.nextMask()) |src| {
-            var child = board;
-            doEnPassant(&child, src, color);
-            swapSides(&child, color);
-            const child_occupied = child.white.occupied() | child.black.occupied();
-            if (isAttackedBy(child, positions.king, child_occupied, reverseColor(color))) continue;
-            nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-        }
-    }
-
-    {
-        if (color == chess.Color.white) {
-            if (castlingRightK(board, occupied, color)) {
-                var child = board;
-                doKingMove(&child, masks.one << 62, color);
-                doRookMove(&child, masks.one << 63, masks.one << 61, color);
-                swapSides(&child, color);
-                nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-            }
-            if (castlingRightQ(board, occupied, color)) {
-                var child = board;
-                doKingMove(&child, masks.one << 58, color);
-                doRookMove(&child, masks.one << 56, masks.one << 59, color);
-                swapSides(&child, color);
-                nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-            }
-        } else {
-            if (castlingRightBlackK(board, occupied, color)) {
-                var child = board;
-                doKingMove(&child, masks.one << 6, color);
-                doRookMove(&child, masks.one << 7, masks.one << 5, color);
-                swapSides(&child, color);
-                nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-            }
-            if (castlingRightBlackQ(board, occupied, color)) {
-                var child = board;
-                doKingMove(&child, masks.one << 2, color);
-                doRookMove(&child, masks.one << 0, masks.one << 3, color);
-                swapSides(&child, color);
-                nodes += perftCallback(child, depth - 1, reverseColor(color), bulk, nodes_list);
-            }
-        }
-    }
-
-    return nodes;
-}
-
-pub fn perft(board: chess.Board, depth: u64, comptime bulk: bool, nodes_list: ?*std.ArrayList(chess.Board)) u64 {
-    switch (board.side_to_move) {
-        .white => return perftCallback(board, depth, .white, bulk, nodes_list),
-        .black => return perftCallback(board, depth, .black, bulk, nodes_list),
-    }
-}
-
 pub fn explore(board: chess.Board, depth: u64, comptime callback: Callback, arg: anytype) void {
     switch (board.side_to_move) {
         .white => exploreCallback(board, depth, .white, callback, arg),
@@ -1147,4 +899,29 @@ fn exploreCallback(board: chess.Board, depth: u64, comptime color: chess.Color, 
             }
         }
     }
+}
+
+const PerftCallbackArg = struct {
+    nodes: u64,
+    bulk: bool,
+    nodes_list: ?*std.ArrayList(chess.Board),
+};
+
+inline fn perftCallback(board: chess.Board, depth: u64, comptime color: chess.Color, arg: anytype) CallbackReturn {
+    if (depth == 1 and arg.bulk) {
+        arg.nodes += countMoves(board, color);
+        return CallbackReturn.abort;
+    }
+    if (depth == 0) {
+        arg.nodes += 1;
+        if (arg.nodes_list) |node_list| node_list.append(board) catch unreachable;
+        return CallbackReturn.abort;
+    }
+    return CallbackReturn.next;
+}
+
+pub fn perft(board: chess.Board, depth: u64, comptime bulk: bool, nodes_list: ?*std.ArrayList(chess.Board)) u64 {
+    var arg = PerftCallbackArg{ .nodes = 0, .bulk = bulk, .nodes_list = nodes_list };
+    explore(board, depth, perftCallback, &arg);
+    return arg.nodes;
 }
