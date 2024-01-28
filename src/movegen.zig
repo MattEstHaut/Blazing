@@ -652,6 +652,264 @@ fn countMoves(board: chess.Board, comptime color: chess.Color) u64 {
     return nodes;
 }
 
+pub fn generate(board: chess.Board, list: *std.ArrayList(chess.Board)) u64 {
+    switch (board.side_to_move) {
+        .white => return generateColorMoves(board, .white, list),
+        .black => return generateColorMoves(board, .black, list),
+    }
+}
+
+fn generateColorMoves(board: chess.Board, comptime color: chess.Color, list: *std.ArrayList(chess.Board)) u64 {
+    const positions = if (color == chess.Color.white) board.white else board.black;
+    const enemy = if (color == chess.Color.white) board.black.occupied() else board.white.occupied();
+    const occupied = positions.occupied() | enemy;
+    const empty_or_enemy = ~occupied | enemy;
+
+    var nodes: u64 = 0;
+
+    const pin_and_check = createPinCheckMasks(board, occupied, color);
+    const en_passant_check = (pawnsForward(pin_and_check.check, 0, color) & board.en_passant) | pin_and_check.check;
+
+    {
+        const lookup = kingLookup(positions.king) & empty_or_enemy;
+        var dest_iter = masks.nextbit(lookup);
+        while (dest_iter.nextMask()) |dest| {
+            if (isAttackedBy(board, dest, occupied, reverseColor(color))) continue;
+            var child = board;
+            doKingMove(&child, dest, color);
+            swapSides(&child, color);
+            list.append(child) catch unreachable;
+            nodes += 1;
+        }
+    }
+
+    if (pin_and_check.checks > 1) return nodes;
+
+    const pin_hv = pin_and_check.pin_hor | pin_and_check.pin_ver;
+    const pin_ad = pin_and_check.pin_asc | pin_and_check.pin_desc;
+
+    {
+        var src_iter = masks.nextbit(positions.knights & ~(pin_hv | pin_ad));
+        while (src_iter.nextMask()) |src| {
+            const lookup = knightLookup(src) & empty_or_enemy & pin_and_check.check;
+            var dest_iter = masks.nextbit(lookup);
+            while (dest_iter.nextMask()) |dest| {
+                var child = board;
+                doKnightMove(&child, src, dest, color);
+                swapSides(&child, color);
+                list.append(child) catch unreachable;
+                nodes += 1;
+            }
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.bishops & ~pin_hv);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_asc & src != 0) {
+                pin_mask = pin_and_check.pin_asc;
+            } else if (pin_and_check.pin_desc & src != 0) {
+                pin_mask = pin_and_check.pin_desc;
+            }
+
+            const lookup = bishopLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
+            var dest_iter = masks.nextbit(lookup);
+            while (dest_iter.nextMask()) |dest| {
+                var child = board;
+                doBishopMove(&child, src, dest, color);
+                swapSides(&child, color);
+                list.append(child) catch unreachable;
+                nodes += 1;
+            }
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.rooks & ~pin_ad);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_hor & src != 0) {
+                pin_mask = pin_and_check.pin_hor;
+            } else if (pin_and_check.pin_ver & src != 0) {
+                pin_mask = pin_and_check.pin_ver;
+            }
+
+            const lookup = rookLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
+            var dest_iter = masks.nextbit(lookup);
+            while (dest_iter.nextMask()) |dest| {
+                var child = board;
+                doRookMove(&child, src, dest, color);
+                swapSides(&child, color);
+                list.append(child) catch unreachable;
+                nodes += 1;
+            }
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.queens);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_hor & src != 0) {
+                pin_mask = pin_and_check.pin_hor;
+            } else if (pin_and_check.pin_ver & src != 0) {
+                pin_mask = pin_and_check.pin_ver;
+            } else if (pin_and_check.pin_asc & src != 0) {
+                pin_mask = pin_and_check.pin_asc;
+            } else if (pin_and_check.pin_desc & src != 0) {
+                pin_mask = pin_and_check.pin_desc;
+            }
+
+            const lookup = queenLookup(src, occupied) & empty_or_enemy & pin_and_check.check & pin_mask;
+            var dest_iter = masks.nextbit(lookup);
+            while (dest_iter.nextMask()) |dest| {
+                var child = board;
+                doQueenMove(&child, src, dest, color);
+                swapSides(&child, color);
+                list.append(child) catch unreachable;
+                nodes += 1;
+            }
+        }
+    }
+
+    {
+        const prom_row = if (color == chess.Color.white) masks.first_row else masks.last_row;
+
+        var src_iter = masks.nextbit(positions.pawns & ~(pin_ad | pin_and_check.pin_hor));
+        while (src_iter.nextMask()) |src| {
+            const dest = pawnsForward(src, occupied, color) & pin_and_check.check;
+            if (dest == 0) continue;
+            var child = board;
+            doPawnForward(&child, dest, color);
+            swapSides(&child, color);
+            if (dest & prom_row != 0) {
+                var child_queen = child;
+                doPromotion(&child_queen, dest, Promotion.queen, color);
+                list.append(child_queen) catch unreachable;
+                var child_rook = child;
+                doPromotion(&child_rook, dest, Promotion.rook, color);
+                list.append(child_rook) catch unreachable;
+                var child_bishop = child;
+                doPromotion(&child_bishop, dest, Promotion.bishop, color);
+                list.append(child_bishop) catch unreachable;
+                var child_knight = child;
+                doPromotion(&child_knight, dest, Promotion.knight, color);
+                list.append(child_knight) catch unreachable;
+                nodes += 4;
+            } else {
+                list.append(child) catch unreachable;
+                nodes += 1;
+            }
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.pawns & ~(pin_ad | pin_and_check.pin_hor));
+        while (src_iter.nextMask()) |src| {
+            const dest = pawnsDoubleForward(src, occupied, color) & pin_and_check.check;
+            if (dest == 0) continue;
+            var child = board;
+            doPawnDoubleForward(&child, dest, color);
+            swapSides(&child, color);
+            list.append(child) catch unreachable;
+            nodes += 1;
+        }
+    }
+
+    {
+        var src_iter = masks.nextbit(positions.pawns & ~pin_hv);
+        while (src_iter.nextMask()) |src| {
+            var pin_mask: masks.Mask = masks.full;
+            if (pin_and_check.pin_asc & src != 0) {
+                pin_mask = pin_and_check.pin_asc;
+            } else if (pin_and_check.pin_desc & src != 0) {
+                pin_mask = pin_and_check.pin_desc;
+            }
+
+            const lookup = pawnCaptures(src, color) & pin_and_check.check & pin_mask & enemy;
+            var dest_iter = masks.nextbit(lookup);
+            while (dest_iter.nextMask()) |dest| {
+                var child = board;
+                doPawnCapture(&child, src, dest, color);
+                swapSides(&child, color);
+                if (dest & (masks.first_row | masks.last_row) != 0) {
+                    var child_queen = child;
+                    doPromotion(&child_queen, dest, Promotion.queen, color);
+                    list.append(child_queen) catch unreachable;
+                    var child_rook = child;
+                    doPromotion(&child_rook, dest, Promotion.rook, color);
+                    list.append(child_rook) catch unreachable;
+                    var child_bishop = child;
+                    doPromotion(&child_bishop, dest, Promotion.bishop, color);
+                    list.append(child_bishop) catch unreachable;
+                    var child_knight = child;
+                    doPromotion(&child_knight, dest, Promotion.knight, color);
+                    list.append(child_knight) catch unreachable;
+                    nodes += 4;
+                } else {
+                    list.append(child) catch unreachable;
+                    nodes += 1;
+                }
+            }
+        }
+    }
+
+    {
+        const lookup = pawnCaptures(board.en_passant & en_passant_check, reverseColor(color));
+        var src_iter = masks.nextbit(positions.pawns & ~pin_hv & lookup);
+        while (src_iter.nextMask()) |src| {
+            var child = board;
+            doEnPassant(&child, src, color);
+            swapSides(&child, color);
+            const child_occupied = child.white.occupied() | child.black.occupied();
+            if (isAttackedBy(child, positions.king, child_occupied, reverseColor(color))) continue;
+            list.append(child) catch unreachable;
+            nodes += 1;
+        }
+    }
+
+    {
+        if (color == chess.Color.white) {
+            if (castlingRightK(board, occupied, color)) {
+                var child = board;
+                doKingMove(&child, masks.one << 62, color);
+                doRookMove(&child, masks.one << 63, masks.one << 61, color);
+                swapSides(&child, color);
+                list.append(child) catch unreachable;
+                nodes += 1;
+            }
+            if (castlingRightQ(board, occupied, color)) {
+                var child = board;
+                doKingMove(&child, masks.one << 58, color);
+                doRookMove(&child, masks.one << 56, masks.one << 59, color);
+                swapSides(&child, color);
+                list.append(child) catch unreachable;
+                nodes += 1;
+            }
+        } else {
+            if (castlingRightBlackK(board, occupied, color)) {
+                var child = board;
+                doKingMove(&child, masks.one << 6, color);
+                doRookMove(&child, masks.one << 7, masks.one << 5, color);
+                swapSides(&child, color);
+                list.append(child) catch unreachable;
+                nodes += 1;
+            }
+            if (castlingRightBlackQ(board, occupied, color)) {
+                var child = board;
+                doKingMove(&child, masks.one << 2, color);
+                doRookMove(&child, masks.one << 0, masks.one << 3, color);
+                swapSides(&child, color);
+                list.append(child) catch unreachable;
+                nodes += 1;
+            }
+        }
+    }
+
+    return nodes;
+}
+
 pub fn explore(board: chess.Board, depth: u64, comptime start: Callback, comptime end: Callback, arg: anytype) void {
     switch (board.side_to_move) {
         .white => exploreCallback(board, depth, .white, start, end, arg),
